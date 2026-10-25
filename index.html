@@ -1,0 +1,1339 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#b84d75">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>こどもそろばん</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap">
+<style>
+html{color-scheme:light}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);box-sizing:border-box}
+body{margin:0;font-size:14px}
+[hidden]{display:none!important}
+/* Layout: one-screen landscape tool — slim header with digit steppers, soroban fills the rest, digits under each rod */
+:root {
+  --bg: #fdf1f5;
+  --fg: #3a2530;
+  --muted: #8a6676;
+  --plate: #fffafc;
+  --plate-line: #f2d3df;
+  --btn: #d6457a;
+  --btn-fg: #ffffff;
+  --step: #f7d9e4;
+  --step-fg: #6b2c47;
+  --font: "Zen Maru Gothic", "Hiragino Maru Gothic ProN", "BIZ UDPGothic", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #22181d; --fg: #f7e6ee; --muted: #b892a4; --plate: #2e2127; --plate-line: #46323b;
+    --btn: #ff7aa8; --btn-fg: #22181d; --step: #46323b; --step-fg: #f7e6ee; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #22181d; --fg: #f7e6ee; --muted: #b892a4; --plate: #2e2127; --plate-line: #46323b;
+  --btn: #ff7aa8; --btn-fg: #22181d; --step: #46323b; --step-fg: #f7e6ee; color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--font);
+  display: flex; flex-direction: column;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 8px;
+  box-sizing: border-box;
+  touch-action: manipulation;
+  -webkit-user-select: none; user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+header {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 10px 20px;
+  padding-block: 4px 8px;
+}
+h1 { margin: 0; font-size: 1.25rem; font-weight: 700; letter-spacing: 0.08em; flex: 1; min-width: 0; }
+h1 small { font-size: 0.75rem; font-weight: 500; color: var(--muted); margin-left: 0.6em; letter-spacing: 0.02em; }
+.steppers { display: flex; gap: 16px; flex-wrap: wrap; }
+.stepper { display: flex; align-items: center; gap: 6px; }
+.stepper .name { font-size: 0.9rem; color: var(--muted); margin-right: 2px; }
+.stepper output { font: 700 1.15rem var(--font); min-width: 3.2em; text-align: center; font-variant-numeric: tabular-nums; }
+.stepper button {
+  font: 700 1.3rem/1 var(--font); width: 44px; height: 44px; border-radius: 50%;
+  border: 0; background: var(--step); color: var(--step-fg); cursor: pointer;
+}
+.stepper button:disabled { opacity: 0.35; cursor: default; }
+.stepper button:not(:disabled):active { transform: translateY(1px); }
+button:focus-visible { outline: 3px solid var(--fg); outline-offset: 3px; }
+button#reset {
+  font: 700 1.1rem var(--font); letter-spacing: 0.1em;
+  background: var(--btn); color: var(--btn-fg);
+  border: 0; border-radius: 999px; padding: 10px 26px; cursor: pointer;
+}
+button#reset:active { transform: translateY(1px); filter: brightness(0.95); }
+.pill {
+  font: 700 1rem var(--font); letter-spacing: 0.08em;
+  background: var(--step); color: var(--step-fg);
+  border: 0; border-radius: 999px; padding: 10px 20px; cursor: pointer;
+}
+.pill:active { transform: translateY(1px); }
+
+/* 設定画面 */
+.overlay {
+  position: fixed; inset: 0; z-index: 20; box-sizing: border-box;
+  background: rgba(60, 18, 38, 0.45);
+  display: flex; align-items: center; justify-content: center;
+  padding: max(12px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px))
+           max(12px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+}
+.sheet {
+  background: var(--plate); color: var(--fg); box-sizing: border-box;
+  width: min(600px, 100%); max-height: 100%; overflow: auto;
+  border-radius: 20px; padding: 16px 22px 18px;
+  box-shadow: 0 14px 40px rgba(80, 16, 46, 0.3);
+}
+.sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 8px; }
+.sheet h2 { margin: 0; font-size: 1.3rem; letter-spacing: 0.12em; }
+.set-row {
+  display: grid; grid-template-columns: 6.5em minmax(0, 1fr); align-items: center; gap: 6px 14px;
+  padding-block: 12px; border-top: 1px solid var(--plate-line);
+}
+.set-row h3 { margin: 0; font-size: 1rem; font-weight: 700; color: var(--muted); letter-spacing: 0.06em; }
+.seg { display: flex; flex-wrap: wrap; gap: 8px; }
+.seg button {
+  font: 700 1rem var(--font); min-width: 3.6em; padding: 9px 16px; cursor: pointer;
+  border-radius: 999px; border: 2px solid var(--step); background: transparent; color: var(--fg);
+}
+.seg button[aria-pressed="true"] { background: var(--btn); border-color: var(--btn); color: var(--btn-fg); }
+.seg .dot {
+  display: inline-block; width: 14px; height: 14px; border-radius: 50%; margin-right: 6px; vertical-align: -2px;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+}
+.note { grid-column: 2; margin: 0; font-size: 0.8rem; color: var(--muted); }
+.howto ul { margin: 0; padding-left: 1.2em; line-height: 1.75; font-size: 0.92rem; }
+@media (max-width: 460px) {
+  .set-row { grid-template-columns: minmax(0, 1fr); }
+  .note { grid-column: 1; }
+}
+main { flex: 1; min-height: 0; display: flex; gap: 16px; align-items: stretch; }
+.board { flex: 3 1 0; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+svg#abacus { width: 100%; flex: 1 1 0; min-height: 0; touch-action: none; display: block; }
+#abacus.hide-answer .answer { visibility: hidden; }
+
+/* 問題モード */
+.quiz-bar { display: flex; align-items: center; gap: 12px; padding-block: 0 6px; }
+.q-count, .q-time { font-size: 0.95rem; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 5.5em; }
+.q-time { text-align: right; }
+.q-number {
+  flex: 1; min-width: 0; text-align: center;
+  font: 700 clamp(2rem, 8vh, 3.6rem)/1.15 var(--font); letter-spacing: 0.1em; font-variant-numeric: tabular-nums;
+  color: var(--fg); background: var(--plate); border: 2px solid var(--plate-line); border-radius: 16px; padding: 2px 16px;
+}
+.celebrate {
+  position: fixed; inset: 0; z-index: 30; cursor: pointer;
+  background: rgba(24, 12, 34, 0.74);
+  display: flex; align-items: center; justify-content: center;
+}
+#fw { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.cel-inner { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; pointer-events: none; text-align: center; padding-inline: 16px; }
+#hanamaru { width: min(84vw, 64vh); height: min(84vw, 64vh); overflow: visible; }
+.cel-title { margin: 0; font: 700 clamp(2rem, 7vh, 3.4rem)/1.2 var(--font); color: #ffffff; letter-spacing: 0.12em; text-shadow: 0 2px 12px rgba(0, 0, 0, 0.45); }
+.cel-sub { margin: 0; font: 500 1.1rem/1.6 var(--font); color: #ffffff; opacity: 0.95; white-space: pre-line; }
+.hm-wrap { position: relative; }
+#cel-sticker { position: absolute; right: -8%; bottom: -4%; width: 40%; aspect-ratio: 1; }
+#cel-sticker svg { width: 100%; height: 100%; }
+
+/* シール */
+.sticker { filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.3)); overflow: visible; }
+.st-outline * { fill: #ffffff !important; stroke: #ffffff !important; stroke-width: 12px !important; stroke-linejoin: round !important; }
+
+/* シールちょう */
+.book-sheet { width: min(760px, 100%); }
+.book-today { margin: 2px 0 10px; font-size: 1.15rem; font-weight: 700; }
+.book-today b { color: var(--btn); font-size: 1.6rem; margin-inline: 0.15em; }
+.month-nav { display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 8px; }
+.month-nav button {
+  width: 42px; height: 42px; border-radius: 50%; border: 0; cursor: pointer;
+  background: var(--step); color: var(--step-fg); font: 700 1.2rem/1 var(--font);
+}
+.month-nav button:disabled { opacity: 0.35; cursor: default; }
+.month-nav .m { font: 700 1.15rem var(--font); min-width: 8em; text-align: center; font-variant-numeric: tabular-nums; }
+.cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.cal .wd { text-align: center; font-size: 0.8rem; color: var(--muted); padding-block: 2px; }
+.cal .sun, .cal .day.sun .n { color: #d6455a; }
+.cal .sat, .cal .day.sat .n { color: #3a7bd5; }
+.cal .day {
+  min-height: 54px; min-width: 0; box-sizing: border-box; border-radius: 10px; padding: 3px 4px;
+  background: var(--bg); display: flex; flex-direction: column; gap: 2px;
+}
+.cal .day.today { outline: 3px solid var(--btn); outline-offset: -3px; }
+.cal .day .n { font-size: 0.78rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.cal .day .stk { display: flex; flex-wrap: wrap; align-items: center; gap: 1px; }
+.cal .day .stk svg { width: 22px; height: 22px; }
+.cal .day .more { font-size: 0.75rem; font-weight: 700; color: var(--fg); }
+.cal .blank { background: transparent; }
+.book-total { margin: 10px 0 0; text-align: right; color: var(--muted); font-size: 0.9rem; }
+.viz {
+  flex: 2 1 0; min-width: 0; min-height: 0; box-sizing: border-box;
+  display: flex; flex-direction: column; gap: 8px; padding: 10px;
+  background: var(--plate); border: 1px solid var(--plate-line); border-radius: 16px;
+}
+#viz-wrap { flex: 1; min-height: 0; position: relative; }
+#viz-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; font-size: 0.85rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.legend .sw { display: inline-block; width: 16px; height: 16px; border-radius: 4px; vertical-align: -3px; margin-right: 4px; border: 1px solid rgba(0,0,0,0.12); }
+#pie-box { display: inline-flex; align-items: center; gap: 4px; }
+#pie-canvas { width: 28px; height: 28px; }
+@media (max-aspect-ratio: 1/1) { main { flex-direction: column; } }
+.bead { transition: transform 110ms cubic-bezier(.3,.7,.4,1); }
+.label { fill: var(--muted); font: 500 20px var(--font); }
+.digit { fill: var(--fg); font: 700 58px var(--font); font-variant-numeric: tabular-nums; }
+.plate { fill: var(--plate); stroke: var(--plate-line); stroke-width: 2; }
+.reading { fill: var(--fg); font: 500 30px var(--font); letter-spacing: 0.04em; }
+@media (prefers-reduced-motion: reduce) { .bead { transition: none; } }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>そろばん</h1>
+  <button id="open-book" class="pill" type="button">シール</button>
+  <button id="open-settings" class="pill" type="button">設定</button>
+  <button id="reset" type="button">御破算</button>
+</header>
+
+<div id="celebrate" class="celebrate" hidden>
+  <canvas id="fw"></canvas>
+  <div class="cel-inner">
+    <div class="hm-wrap">
+      <svg id="hanamaru" viewBox="0 0 400 400" aria-hidden="true"></svg>
+      <div id="cel-sticker" hidden></div>
+    </div>
+    <p class="cel-title" id="cel-title">せいかい！</p>
+    <p class="cel-sub" id="cel-sub">タップでつぎのもんだい</p>
+  </div>
+</div>
+
+<div id="book" class="overlay" hidden>
+  <div class="sheet book-sheet" role="dialog" aria-modal="true" aria-labelledby="book-title">
+    <div class="sheet-head">
+      <h2 id="book-title">シールちょう</h2>
+      <button id="close-book" class="pill" type="button">とじる</button>
+    </div>
+    <p class="book-today" id="book-today"></p>
+    <div class="month-nav">
+      <button id="m-prev" type="button" aria-label="まえのつき">‹</button>
+      <span class="m" id="m-label"></span>
+      <button id="m-next" type="button" aria-label="つぎのつき">›</button>
+    </div>
+    <div class="cal" id="cal"></div>
+    <p class="book-total" id="book-total"></p>
+  </div>
+</div>
+
+<div id="settings" class="overlay" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+    <div class="sheet-head">
+      <h2 id="settings-title">設定</h2>
+      <button id="close-settings" class="pill" type="button">とじる</button>
+    </div>
+    <section class="set-row">
+      <h3>モード</h3>
+      <div class="seg" id="seg-mode" role="group" aria-label="モード">
+        <button type="button" data-v="basic">きほん</button>
+        <button type="button" data-v="quiz">もんだい</button>
+      </div>
+    </section>
+    <section class="set-row">
+      <h3>桁数</h3>
+      <div class="steppers">
+        <div class="stepper" aria-label="整数の桁数">
+          <span class="name">整数</span>
+          <button id="int-minus" type="button" aria-label="整数の桁をへらす">−</button>
+          <output id="int-out">4桁</output>
+          <button id="int-plus" type="button" aria-label="整数の桁をふやす">＋</button>
+        </div>
+        <div class="stepper" aria-label="小数の桁数">
+          <span class="name">小数</span>
+          <button id="dec-minus" type="button" aria-label="小数の桁をへらす">−</button>
+          <output id="dec-out">1桁</output>
+          <button id="dec-plus" type="button" aria-label="小数の桁をふやす">＋</button>
+        </div>
+      </div>
+    </section>
+    <section class="set-row">
+      <h3>音</h3>
+      <div class="seg" id="seg-sound" role="group" aria-label="音">
+        <button type="button" data-v="on">あり</button>
+        <button type="button" data-v="off">なし</button>
+      </div>
+    </section>
+    <section class="set-row">
+      <h3>キラキラ</h3>
+      <div class="seg" id="seg-sparkle" role="group" aria-label="キラキラ">
+        <button type="button" data-v="big">大</button>
+        <button type="button" data-v="mid">中</button>
+        <button type="button" data-v="small">小</button>
+        <button type="button" data-v="off">オフ</button>
+      </div>
+    </section>
+    <section class="set-row">
+      <h3>色合い</h3>
+      <div class="seg" id="seg-color" role="group" aria-label="色合い"></div>
+    </section>
+    <section class="set-row howto">
+      <h3>あそびかた</h3>
+      <ul>
+        <li>玉をタップするか、上下にはじいて動かす</li>
+        <li>はりを横に3けた以上なぞると御破算</li>
+      </ul>
+    </section>
+  </div>
+</div>
+<main>
+  <div class="board">
+    <div class="quiz-bar" id="quiz-bar" hidden>
+      <span class="q-count" id="q-count">1 / 5もん</span>
+      <div class="q-number" id="q-number" aria-live="polite">0</div>
+      <span class="q-time" id="q-time">0:00</span>
+    </div>
+    <svg id="abacus" role="img" aria-label="そろばん 0" preserveAspectRatio="xMidYMid meet"></svg>
+  </div>
+  <section class="viz" id="viz" aria-label="数を赤丸で表示">
+    <div id="viz-wrap"><canvas id="viz-canvas"></canvas></div>
+    <div class="legend" id="legend"></div>
+  </section>
+</main>
+
+<script>
+(() => {
+  const NS = "http://www.w3.org/2000/svg";
+  const INT_MIN = 1, INT_MAX = 9, DEC_MIN = 0, DEC_MAX = 3;
+  const INT_NAMES = ["一", "十", "百", "千", "万", "十万", "百万", "千万", "億"];
+  const DEC_NAMES = ["0.1", "0.01", "0.001"];
+
+  const S = 130;                  // rod spacing
+  const FX = 30;                  // frame side thickness
+  const FT = 30;                  // frame top/bottom thickness
+  const H = 46;                   // bead height
+  const BW = 112;                 // bead width
+  const LABEL_H = 46;
+  const T0 = LABEL_H + FT;        // heaven area top (inner)
+  const B0 = T0 + 2 * H;          // beam top
+  const BEAM = 16;
+  const B1 = B0 + BEAM;           // earth area top (beam bottom)
+  const F1 = B1 + 5 * H;          // earth area bottom (inner)
+  const DIGIT_Y = F1 + FT + 18;
+  const READ_Y = DIGIT_Y + 76 + 42;
+  const VH = READ_Y + 14;
+
+  // ===== 色合い =====
+  // wood:枠 inner:内側 rod:軸 beam:はり dot:定位点 bead:一玉 beadH:五玉（省略時は一玉と同じ）
+  const THEMES = {
+    pink: { label: "ピンク", sw: "#f48fb4",
+      wood: ["#e07aa0", "#b84d75"], inner: "#fff3f7", rod: ["#d7a9bb", "#fbe9f0"], beam: "#8c2f55", beamA: "#c4467a", dot: "#ffffff",
+      bead: ["#ffd3e3", "#f48fb4", "#e06f9a", "#b84a76"], edge: "#8c2f55",
+      light: { bg: "#fdf1f5", fg: "#3a2530", muted: "#8a6676", plate: "#fffafc", line: "#f2d3df", btn: "#d6457a", btnFg: "#ffffff", step: "#f7d9e4", stepFg: "#6b2c47" },
+      dark: { bg: "#22181d", fg: "#f7e6ee", muted: "#b892a4", plate: "#2e2127", line: "#46323b", btn: "#ff7aa8", btnFg: "#22181d", step: "#46323b", stepFg: "#f7e6ee" } },
+    purple: { label: "むらさき", sw: "#a477e6",
+      wood: ["#8a5ac4", "#5a2f8f"], inner: "#f7f1ff", rod: ["#b9a6d6", "#efe8fb"], beam: "#3e1f66", beamA: "#6a3fa6", dot: "#ffd86b",
+      bead: ["#eadcff", "#b388eb", "#9a6ad6", "#6b3fa8"], edge: "#3e1f66",
+      beadH: ["#fff2b8", "#ffd86b", "#f2c04a", "#c9952a"],
+      light: { bg: "#f5f0fb", fg: "#2e2440", muted: "#7a6a92", plate: "#fdfaff", line: "#e3d6f3", btn: "#7b4bb3", btnFg: "#ffffff", step: "#e9def7", stepFg: "#4b2d78" },
+      dark: { bg: "#1d1826", fg: "#efe6ff", muted: "#a796c2", plate: "#2a2236", line: "#3e3350", btn: "#b48cf0", btnFg: "#1d1826", step: "#3e3350", stepFg: "#efe6ff" } },
+    sky: { label: "みずいろ", sw: "#8fd3f2",
+      wood: ["#5bb8e0", "#2f8fbf"], inner: "#f0faff", rod: ["#a9d4e6", "#e8f7fd"], beam: "#1d5f85", beamA: "#3a8fc0", dot: "#fff36b",
+      bead: ["#e0f6ff", "#8fd3f2", "#6bbde6", "#3d93c2"], edge: "#1d5f85",
+      beadH: ["#fffbd0", "#fff36b", "#f5dd3a", "#c9a81c"],
+      light: { bg: "#eff8fc", fg: "#1f3340", muted: "#5f7f90", plate: "#fbfeff", line: "#d3e9f3", btn: "#2f9fd4", btnFg: "#ffffff", step: "#d8eef8", stepFg: "#1d5f85" },
+      dark: { bg: "#151e24", fg: "#e3f4fc", muted: "#8fb0c0", plate: "#1f2b33", line: "#2f414d", btn: "#6cc8f0", btnFg: "#151e24", step: "#2f414d", stepFg: "#e3f4fc" } },
+    white: { label: "しろ", sw: "#ffffff",
+      wood: ["#ebe8f3", "#c4bfd6"], inner: "#ffffff", rod: ["#d8d4e2", "#ffffff"], beam: "#c9a648", beamA: "#e0c26a", dot: "#ffffff",
+      bead: ["#ffffff", "#f3f0f9", "#e2dcef", "#c3bad9"], edge: "#8f86ab",
+      light: { bg: "#eceaf2", fg: "#2b2833", muted: "#77728a", plate: "#ffffff", line: "#dedbe8", btn: "#b8963a", btnFg: "#ffffff", step: "#e2dfeb", stepFg: "#4a4560" },
+      dark: { bg: "#1b1a20", fg: "#f0eef6", muted: "#a19db3", plate: "#26252d", line: "#393744", btn: "#d9b85a", btnFg: "#1b1a20", step: "#393744", stepFg: "#f0eef6" } },
+    black: { label: "くろ", sw: "#2a2430",
+      wood: ["#2f2a35", "#121014"], inner: "#ece7f1", rod: ["#7a7083", "#c8bfd1"], beam: "#a3275f", beamA: "#d0458a", dot: "#ffffff",
+      bead: ["#7a7085", "#3a3340", "#28222d", "#0d0b0f"], edge: "#000000",
+      light: { bg: "#e8e5ec", fg: "#1c1a1f", muted: "#6b6573", plate: "#f8f7f9", line: "#d6d2db", btn: "#2b2630", btnFg: "#ffffff", step: "#d9d5de", stepFg: "#2b2630" },
+      dark: { bg: "#121014", fg: "#eee8f2", muted: "#9d94a6", plate: "#1f1b22", line: "#332d38", btn: "#c04a8a", btnFg: "#ffffff", step: "#332d38", stepFg: "#eee8f2" } },
+    fire: { label: "しょうぼうしゃ", sw: "#e8382e",
+      wood: ["#e8382e", "#a51812"], inner: "#fdf6f3", rod: ["#b9bec4", "#f2f4f6"], beam: "#9aa1a8", beamA: "#ffd23f", dot: "#e8382e",
+      bead: ["#ff9a8c", "#e8382e", "#d0261d", "#9c140e"], edge: "#6e0d09",
+      beadH: ["#ffffff", "#eef0f2", "#d4d8dc", "#a9afb6"],
+      light: { bg: "#fbf1ef", fg: "#2d1b1a", muted: "#8a5f5b", plate: "#fffaf9", line: "#f1d6d2", btn: "#d8261d", btnFg: "#ffffff", step: "#f6dcd8", stepFg: "#8c1a13" },
+      dark: { bg: "#201514", fg: "#fbe9e6", muted: "#c0938e", plate: "#2d1e1c", line: "#45302d", btn: "#ff5a4f", btnFg: "#201514", step: "#45302d", stepFg: "#fbe9e6" } },
+    police: { label: "パトカー", sw: "linear-gradient(#ffffff 50%, #111111 50%)",
+      wood: ["#2a2c30", "#0f1012"], inner: "#ffffff", rod: ["#a8adb3", "#eceff2"], beam: "#111111", beamA: "#e8262c", dot: "#ffffff",
+      bead: ["#ffffff", "#f2f2f2", "#1d1d1f", "#000000"], edge: "#000000",
+      beadH: ["#ff8a8a", "#e8262c", "#cc1a20", "#8f0f14"],
+      light: { bg: "#f0f1f3", fg: "#18191b", muted: "#63666c", plate: "#ffffff", line: "#d9dbdf", btn: "#e8262c", btnFg: "#ffffff", step: "#e1e3e6", stepFg: "#18191b" },
+      dark: { bg: "#121315", fg: "#eef0f2", muted: "#9a9ea6", plate: "#1d1f22", line: "#33363b", btn: "#ff4d52", btnFg: "#121315", step: "#33363b", stepFg: "#eef0f2" } },
+    standard: { label: "スタンダード", sw: "#c98a4b",
+      wood: ["#6b4428", "#4a2d19"], inner: "#f6ecd9", rod: ["#8e7a55", "#e6d6a8"], beam: "#3b2414", beamA: "#6a4226", dot: "#f6ecd9",
+      bead: ["#e8b77a", "#c98a4b", "#a96c35", "#7e4c22"], edge: "#5c3616",
+      light: { bg: "#f3efe7", fg: "#2e2620", muted: "#7a6d62", plate: "#fffdf8", line: "#e2d8ca", btn: "#9c3d2b", btnFg: "#fff8f2", step: "#e6dccd", stepFg: "#4a3a2e" },
+      dark: { bg: "#1d1916", fg: "#f1e8de", muted: "#a8998b", plate: "#2a2420", line: "#3d3530", btn: "#c4593f", btnFg: "#1d1916", step: "#3a322c", stepFg: "#f1e8de" } }
+  };
+  let colorKey = "pink";
+  try { const ck = localStorage.getItem("soroban-color"); if (THEMES[ck]) colorKey = ck; } catch (_) {}
+  let BEAM_FILL, BEAM_ACTIVE;
+  const themeStyle = document.createElement("style");
+  document.head.appendChild(themeStyle);
+  function applyTheme() {
+    const t = THEMES[colorKey];
+    BEAM_FILL = t.beam; BEAM_ACTIVE = t.beamA;
+    const vars = p => `--bg:${p.bg};--fg:${p.fg};--muted:${p.muted};--plate:${p.plate};--plate-line:${p.line};--btn:${p.btn};--btn-fg:${p.btnFg};--step:${p.step};--step-fg:${p.stepFg};`;
+    themeStyle.textContent =
+      `:root{${vars(t.light)}}` +
+      `@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){${vars(t.dark)}color-scheme:dark}}` +
+      `:root[data-theme="dark"]{${vars(t.dark)}color-scheme:dark}`;
+  }
+  applyTheme();
+
+  const svg = document.getElementById("abacus");
+
+  // 桁設定（前回の設定を覚えておく）
+  let intDigits = 4, decDigits = 1;
+  try {
+    const saved = JSON.parse(localStorage.getItem("soroban-digits") || "null");
+    if (saved) {
+      intDigits = Math.min(INT_MAX, Math.max(INT_MIN, saved.i | 0));
+      decDigits = Math.min(DEC_MAX, Math.max(DEC_MIN, saved.d | 0));
+    }
+  } catch (_) {}
+
+  // 位ごとの玉の状態（キー: 一の位=0, 十の位=1, 0.1の位=-1 …）
+  const values = new Map();
+  const getVal = place => {
+    if (!values.has(place)) values.set(place, { h: 0, n: 0 });
+    return values.get(place);
+  };
+
+  // 現在の盤面
+  let RODS, places, W, beamEl, heavenEls, earthEls, digitEls, readingEl, sparkLayer;
+
+  // キラキラ
+  const REDUCED = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const STAR = "M0,-12 Q0,0 12,0 Q0,0 0,12 Q0,0 -12,0 Q0,0 0,-12 Z";
+  const SPARK_COLORS = ["#ffffff", "#fff3a6", "#ffe27a", "#ff7eb3", "#ffc1dc", "#d9b8ff", "#a8e4ff"];
+  const pick = arr => arr[(Math.random() * arr.length) | 0];
+  let activeSparks = 0;
+  let SPARK_LIMIT = 180;
+  let sparkleLevel = "mid";        // big / mid / small / off
+  try {
+    const sv = localStorage.getItem("soroban-sparkle");
+    if (["big", "mid", "small", "off"].includes(sv)) sparkleLevel = sv;
+  } catch (_) {}
+  // 小：星がふわっと浮かぶだけ
+  function sparkleSmall(x, y) {
+    for (let k = 0; k < 4; k++) {
+      const p = k < 3
+        ? el("path", { d: STAR, fill: pick(["#ffffff", "#fff3a6", "#ffd1e3", "#ffe27a"]), stroke: "#f48fb4", "stroke-width": 0.8 }, sparkLayer)
+        : el("circle", { r: 3.5, fill: "#ffffff" }, sparkLayer);
+      const px = x + (Math.random() - 0.5) * BW * 0.95, py = y + (Math.random() - 0.5) * H * 0.9;
+      const s = 0.55 + Math.random() * 0.6, rot = (Math.random() < 0.5 ? -1 : 1) * (90 + Math.random() * 90);
+      animateSpark(p, [
+        { transform: `translate(${px}px, ${py}px) scale(0) rotate(0deg)`, opacity: 1 },
+        { transform: `translate(${px}px, ${py - 6}px) scale(${s}) rotate(${rot / 2}deg)`, opacity: 1, offset: 0.4 },
+        { transform: `translate(${px}px, ${py - 16}px) scale(0.1) rotate(${rot}deg)`, opacity: 0 }
+      ], { duration: 520 + Math.random() * 260, delay: 40 + Math.random() * 90, easing: "ease-out" });
+    }
+  }
+  function animateSpark(p, frames, opts) {
+    activeSparks++;
+    const a = p.animate(frames, Object.assign({ easing: "cubic-bezier(.2,.7,.3,1)", fill: "both" }, opts));
+    a.onfinish = a.oncancel = () => { p.remove(); activeSparks--; };
+  }
+  function sparkle(x, y) {
+    if (REDUCED || !sparkLayer || sparkleLevel === "off") return;
+    SPARK_LIMIT = sparkleLevel === "big" ? 320 : 180;
+    if (activeSparks > SPARK_LIMIT || !sparkLayer.animate) return;
+    if (sparkleLevel === "small") { sparkleSmall(x, y); return; }
+    const big = sparkleLevel === "big";
+
+    // 光の輪（ぱっと広がる）
+    const ring = el("ellipse", { rx: BW * 0.42, ry: H * 0.62, fill: "none", stroke: "#ffffff", "stroke-width": big ? 7 : 5 }, sparkLayer);
+    animateSpark(ring, [
+      { transform: `translate(${x}px, ${y}px) scale(0.4)`, opacity: 0.95 },
+      { transform: `translate(${x}px, ${y}px) scale(${big ? 2.3 : 1.7})`, opacity: 0 }
+    ], { duration: big ? 650 : 520 });
+    if (big) {
+      const ring2 = el("ellipse", { rx: BW * 0.42, ry: H * 0.62, fill: "none", stroke: "#ff7eb3", "stroke-width": 4 }, sparkLayer);
+      animateSpark(ring2, [
+        { transform: `translate(${x}px, ${y}px) scale(0.3)`, opacity: 0.9 },
+        { transform: `translate(${x}px, ${y}px) scale(2.7)`, opacity: 0 }
+      ], { duration: 760, delay: 90 });
+    }
+    const flash = el("circle", { r: big ? 36 : 26, fill: "#fff6fa" }, sparkLayer);
+    animateSpark(flash, [
+      { transform: `translate(${x}px, ${y}px) scale(0.2)`, opacity: 0.9 },
+      { transform: `translate(${x}px, ${y}px) scale(1.4)`, opacity: 0 }
+    ], { duration: big ? 420 : 360 });
+
+    // 飛び散る星と光の粒
+    const total = big ? 18 : 11, stars = big ? 12 : 7;
+    for (let k = 0; k < total; k++) {
+      const star = k < stars;
+      const col = pick(SPARK_COLORS);
+      const p = star
+        ? el("path", { d: STAR, fill: col, stroke: "#ff5c9d", "stroke-width": 0.9 }, sparkLayer)
+        : el("circle", { r: 3 + Math.random() * 3, fill: col }, sparkLayer);
+      const ang = Math.random() * Math.PI * 2;
+      const dist = big ? 60 + Math.random() * 100 : 40 + Math.random() * 70;
+      const sx = x + Math.cos(ang) * 10, sy = y + Math.sin(ang) * 6;
+      const mx = x + Math.cos(ang) * dist * 0.6, my = y + Math.sin(ang) * dist * 0.45 - 8;
+      const ex = x + Math.cos(ang) * dist, ey = y + Math.sin(ang) * dist * 0.7 - 22;
+      const s = star ? (big ? 1.1 + Math.random() * 1.3 : 0.9 + Math.random() * 1.0) : (big ? 1.4 : 1);
+      const rot = (Math.random() < 0.5 ? -1 : 1) * (180 + Math.random() * 180);
+      animateSpark(p, [
+        { transform: `translate(${sx}px, ${sy}px) scale(0) rotate(0deg)`, opacity: 1 },
+        { transform: `translate(${mx}px, ${my}px) scale(${s}) rotate(${rot * 0.4}deg)`, opacity: 1, offset: 0.35 },
+        { transform: `translate(${(mx + ex) / 2}px, ${(my + ey) / 2}px) scale(${s * 0.8}) rotate(${rot * 0.7}deg)`, opacity: 0.55, offset: 0.6 },
+        { transform: `translate(${(mx + ex) / 2 + 2}px, ${(my + ey) / 2 - 3}px) scale(${s * 0.9}) rotate(${rot * 0.8}deg)`, opacity: 1, offset: 0.72 },
+        { transform: `translate(${ex}px, ${ey}px) scale(0.1) rotate(${rot}deg)`, opacity: 0 }
+      ], { duration: (big ? 900 : 700) + Math.random() * (big ? 550 : 400), delay: 20 + Math.random() * (big ? 180 : 120) });
+    }
+  }
+  function moveBead(g, top, i) {
+    const moved = g._top !== undefined && g._top !== top;
+    if (moved) sparkle(cx(i), top + H / 2);
+    g._top = top;
+    g.style.transform = `translateY(${top}px)`;
+    return moved;
+  }
+
+  // 「パチッ」という音（その場で合成）
+  let soundOn = true;
+  try { soundOn = localStorage.getItem("soroban-sound") !== "off"; } catch (_) {}
+  let actx = null, noiseBuf = null;
+  function ensureAudio() {
+    if (!soundOn) return;
+    try {
+      if (!actx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+        actx = new AC();
+        const len = Math.floor(actx.sampleRate * 0.05);
+        noiseBuf = actx.createBuffer(1, len, actx.sampleRate);
+        const d = noiseBuf.getChannelData(0);
+        for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
+      }
+      if (actx.state === "suspended") actx.resume();
+    } catch (_) {}
+  }
+  function clack(t, vol) {
+    const src = actx.createBufferSource();
+    src.buffer = noiseBuf;
+    const bp = actx.createBiquadFilter();
+    bp.type = "bandpass"; bp.frequency.value = 2400 + Math.random() * 900; bp.Q.value = 3;
+    const g = actx.createGain();
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.045);
+    src.connect(bp); bp.connect(g); g.connect(actx.destination);
+    src.start(t); src.stop(t + 0.06);
+    const o = actx.createOscillator();
+    o.type = "triangle";
+    o.frequency.setValueAtTime(1500 + Math.random() * 200, t);
+    o.frequency.exponentialRampToValueAtTime(900, t + 0.03);
+    const og = actx.createGain();
+    og.gain.setValueAtTime(vol * 0.35, t);
+    og.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
+    o.connect(og); og.connect(actx.destination);
+    o.start(t); o.stop(t + 0.05);
+  }
+  function playClack(rods) {
+    if (!soundOn || !actx) return;
+    try {
+      const t0 = actx.currentTime + 0.07;          // 玉が当たるころに鳴らす
+      const n = Math.min(rods, 8);
+      for (let k = 0; k < n; k++) clack(t0 + k * 0.022 + Math.random() * 0.008, k === 0 ? 0.9 : 0.6);
+    } catch (_) {}
+  }
+
+  // 数の読み方（ひらがな）
+  const R_D = ["", "いち", "に", "さん", "よん", "ご", "ろく", "なな", "はち", "きゅう"];
+  const R_SEN = ["", "せん", "にせん", "さんぜん", "よんせん", "ごせん", "ろくせん", "ななせん", "はっせん", "きゅうせん"];
+  const R_HYAKU = ["", "ひゃく", "にひゃく", "さんびゃく", "よんひゃく", "ごひゃく", "ろっぴゃく", "ななひゃく", "はっぴゃく", "きゅうひゃく"];
+  const R_JU = ["", "じゅう", "にじゅう", "さんじゅう", "よんじゅう", "ごじゅう", "ろくじゅう", "ななじゅう", "はちじゅう", "きゅうじゅう"];
+  const read4 = (n, beforeUnit) => {
+    const t = Math.floor(n / 1000), h = Math.floor(n / 100) % 10, j = Math.floor(n / 10) % 10, o = n % 10;
+    return (beforeUnit && t === 1 ? "いっせん" : R_SEN[t]) + R_HYAKU[h] + R_JU[j] + R_D[o];
+  };
+  function readNumber(N, decs) {
+    let s;
+    if (N === 0) s = "れい";
+    else {
+      const oku = Math.floor(N / 1e8), man = Math.floor(N / 1e4) % 1e4, rest = N % 1e4;
+      s = (oku ? read4(oku, true) + "おく" : "") + (man ? read4(man, true) + "まん" : "") + read4(rest, false);
+    }
+    const d = decs.slice();
+    while (d.length && d[d.length - 1] === 0) d.pop();   // 末尾の0は読まない
+    if (d.length) s += "　てん　" + d.map(x => (x === 0 ? "れい" : R_D[x])).join("");
+    return s;
+  }
+
+  const el = (tag, attrs, parent) => {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  };
+  const cx = i => FX + S * i + S / 2;
+  const heavenTop = h => (h ? B0 - H : T0);
+  const earthTop = (bi, n) => (bi < n ? B1 + bi * H : B1 + (bi + 1) * H);
+  const beadPath = c => {
+    const l = c - BW / 2, r = c + BW / 2, m = H / 2, k = 30;
+    return `M${l},${m} L${c - k},2 L${c + k},2 L${r},${m} L${c + k},${H - 2} L${c - k},${H - 2} Z`;
+  };
+
+  function build() {
+    // 範囲外になった位の値は捨てる
+    for (const p of [...values.keys()]) if (p >= intDigits || p < -decDigits) values.delete(p);
+
+    places = [];
+    for (let p = intDigits - 1; p >= 0; p--) places.push(p);
+    for (let d = 1; d <= decDigits; d++) places.push(-d);
+    RODS = places.length;
+    W = FX * 2 + S * RODS;
+
+    svg.textContent = "";
+    svg.setAttribute("viewBox", `0 0 ${W} ${VH}`);
+    const T = THEMES[colorKey];
+
+    const defs = el("defs", {}, svg);
+    const wood = el("linearGradient", { id: "wood", x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
+    el("stop", { offset: "0", "stop-color": T.wood[0] }, wood);
+    el("stop", { offset: "1", "stop-color": T.wood[1] }, wood);
+    const beadGrad = (id, c) => {
+      const g = el("linearGradient", { id, x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
+      ["0", "0.48", "0.52", "1"].forEach((o, k) => el("stop", { offset: o, "stop-color": c[k] }, g));
+    };
+    beadGrad("bead", T.bead);
+    beadGrad("beadH", T.beadH || T.bead);
+    const rodG = el("linearGradient", { id: "rod", x1: 0, y1: 0, x2: 1, y2: 0 }, defs);
+    el("stop", { offset: "0", "stop-color": T.rod[0] }, rodG);
+    el("stop", { offset: "0.5", "stop-color": T.rod[1] }, rodG);
+    el("stop", { offset: "1", "stop-color": T.rod[0] }, rodG);
+
+    // 位の名前
+    places.forEach((p, i) => {
+      const t = el("text", { x: cx(i), y: LABEL_H - 14, "text-anchor": "middle", class: "label" }, svg);
+      t.textContent = p >= 0 ? INT_NAMES[p] : DEC_NAMES[-p - 1];
+    });
+
+    // 枠
+    el("rect", { x: 0, y: LABEL_H, width: W, height: F1 + FT - LABEL_H, rx: 14, fill: "url(#wood)" }, svg);
+    el("rect", { x: FX, y: T0, width: S * RODS, height: F1 - T0, fill: T.inner }, svg);
+    for (let i = 0; i < RODS; i++) {
+      el("rect", { x: cx(i) - 4, y: T0, width: 8, height: F1 - T0, fill: "url(#rod)" }, svg);
+    }
+
+    // はりと定位点（一の位から3桁ごと）
+    beamEl = el("rect", { x: FX - 4, y: B0, width: S * RODS + 8, height: BEAM, fill: BEAM_FILL }, svg);
+    beamEl.style.transition = "fill 120ms";
+    places.forEach((p, i) => {
+      if (p >= 0 && p % 3 === 0) el("circle", { cx: cx(i), cy: B0 + BEAM / 2, r: 4, fill: T.dot }, svg);
+    });
+
+    // 玉
+    const makeBead = (i, heaven) => {
+      const g = el("g", { class: "bead" }, svg);
+      el("path", { d: beadPath(cx(i)), fill: heaven ? "url(#beadH)" : "url(#bead)", stroke: T.edge, "stroke-width": 1.5, "stroke-linejoin": "round" }, g);
+      el("rect", { x: cx(i) - 5, y: 0, width: 10, height: H, fill: T.edge, opacity: 0.3 }, g);
+      g.style.transition = "none";
+      return g;
+    };
+    heavenEls = []; earthEls = [];
+    for (let i = 0; i < RODS; i++) {
+      heavenEls.push(makeBead(i, true));
+      earthEls.push([0, 1, 2, 3].map(() => makeBead(i)));
+    }
+
+    // 数字表示
+    el("rect", { x: FX, y: DIGIT_Y, width: S * RODS, height: 76, rx: 14, class: "plate answer" }, svg);
+    digitEls = places.map((_, i) =>
+      el("text", { x: cx(i), y: DIGIT_Y + 60, "text-anchor": "middle", class: "digit answer" }, svg));
+    if (decDigits > 0) {
+      const dot = el("text", { x: FX + S * intDigits, y: DIGIT_Y + 60, "text-anchor": "middle", class: "digit answer" }, svg);
+      dot.textContent = ".";
+    }
+    readingEl = el("text", { x: FX + S * RODS / 2, y: READ_Y, "text-anchor": "middle", class: "reading answer" }, svg);
+    sparkLayer = el("g", { "pointer-events": "none" }, svg);
+    activeSparks = 0;
+
+    swipes.clear();
+    render();
+    requestAnimationFrame(() => requestAnimationFrame(() =>
+      svg.querySelectorAll(".bead").forEach(g => (g.style.transition = ""))));
+    updateControls();
+  }
+
+  function render() {
+    const v = [];
+    let movedRods = 0;
+    places.forEach((p, i) => {
+      const s = getVal(p);
+      let m = moveBead(heavenEls[i], heavenTop(s.h), i);
+      earthEls[i].forEach((g, bi) => { if (moveBead(g, earthTop(bi, s.n), i)) m = true; });
+      if (m) movedRods++;
+      const d = s.h * 5 + s.n;
+      digitEls[i].textContent = d;
+      v.push(d);
+    });
+    const label = v.slice(0, intDigits).join("") + (decDigits ? "." + v.slice(intDigits).join("") : "");
+    svg.setAttribute("aria-label", `そろばん ${label}`);
+    let N = 0;
+    places.forEach((p, i) => { if (p >= 0) N += v[i] * 10 ** p; });
+    const tenth = decDigits ? v[intDigits] : 0;
+    readingEl.textContent = readNumber(N, v.slice(intDigits));
+    readingEl.removeAttribute("textLength");
+    const maxW = S * RODS - 24;
+    try {
+      if (readingEl.getComputedTextLength() > maxW) {
+        readingEl.setAttribute("textLength", maxW);
+        readingEl.setAttribute("lengthAdjust", "spacingAndGlyphs");
+      }
+    } catch (_) {}
+    drawViz(N, tenth);
+    if (movedRods) playClack(movedRods);
+    svg.classList.toggle("hide-answer", mode === "quiz" && !quiz.solved);
+    checkQuiz();
+  }
+
+  function toLocal(e) {
+    const pt = svg.createSVGPoint();
+    pt.x = e.clientX; pt.y = e.clientY;
+    return pt.matrixTransform(svg.getScreenCTM().inverse());
+  }
+
+  function resetAll() {
+    ensureAudio();
+    values.clear();
+    render();
+  }
+
+  // ===== 操作：タップ／上下スワイプ／はりを横になぞると御破算 =====
+  const BEAM_TOL = 10;
+  const SWIPE_TH = H * 0.35;     // これ以上上下に動けばスワイプ
+  const swipes = new Map();       // pointerId -> {start, beam, minRod, maxRod, done}
+  const rodAt = x => Math.max(0, Math.min(RODS - 1, Math.floor((x - FX) / S)));
+
+  svg.addEventListener("pointerdown", e => {
+    ensureAudio();
+    const p = toLocal(e);
+    if (p.x < FX || p.x > FX + S * RODS) return;
+    if (p.y < T0 - FT || p.y > F1 + FT) return;
+    const r = rodAt(p.x);
+    const beam = p.y >= B0 - BEAM_TOL && p.y <= B1 + BEAM_TOL;
+    swipes.set(e.pointerId, { start: p, beam, minRod: r, maxRod: r, done: false });
+    try { svg.setPointerCapture(e.pointerId); } catch (_) {}
+    if (beam) beamEl.setAttribute("fill", BEAM_ACTIVE);
+    e.preventDefault();
+  });
+
+  svg.addEventListener("pointermove", e => {
+    const g = swipes.get(e.pointerId);
+    if (!g || g.done) return;
+    const p = toLocal(e);
+    const dx = p.x - g.start.x, dy = p.y - g.start.y;
+    if (g.beam) {
+      const r = rodAt(p.x);
+      g.minRod = Math.min(g.minRod, r);
+      g.maxRod = Math.max(g.maxRod, r);
+      if (g.maxRod - g.minRod + 1 >= 3) { g.done = true; resetAll(); return; }
+    }
+    if (Math.abs(dy) >= SWIPE_TH && Math.abs(dy) > Math.abs(dx)) {
+      g.done = true;
+      applySwipe(g.start, dy < 0 ? -1 : 1);
+    } else if (!g.beam && Math.abs(dx) > S * 0.6) {
+      g.done = true;               // 横にずれただけの操作は無視
+    }
+  });
+
+  const endSwipe = e => {
+    const g = swipes.get(e.pointerId);
+    if (!g) return;
+    swipes.delete(e.pointerId);
+    if (![...swipes.values()].some(x => x.beam)) beamEl.setAttribute("fill", BEAM_FILL);
+    if (e.type !== "pointerup" || g.done) return;
+    // ほとんど動いていなければタップとして扱う
+    const p = toLocal(e);
+    if (Math.abs(p.x - g.start.x) < S / 2 && Math.abs(p.y - g.start.y) < SWIPE_TH) applyTap(g.start);
+  };
+  svg.addEventListener("pointerup", endSwipe);
+  svg.addEventListener("pointercancel", endSwipe);
+
+  // スワイプ：起点の玉を、指を動かした向きへ弾く
+  function applySwipe(p, dir) {
+    const i = Math.floor((p.x - FX) / S);
+    if (i < 0 || i >= RODS) return;
+    const s = getVal(places[i]);
+    if (p.y < B0 + BEAM / 2) {
+      // 五玉：下へ→入れる、上へ→払う
+      s.h = dir > 0 ? 1 : 0;
+    } else {
+      // 触った一玉（隙間ならいちばん近い玉）
+      let idx = 0, best = Infinity;
+      for (let bi = 0; bi < 4; bi++) {
+        const top = earthTop(bi, s.n);
+        const d = p.y < top ? top - p.y : p.y > top + H ? p.y - top - H : 0;
+        if (d < best) { best = d; idx = bi; }
+      }
+      if (dir < 0) s.n = Math.max(s.n, idx + 1);   // 上へ：その玉と上の玉をはりへ
+      else s.n = Math.min(s.n, idx);              // 下へ：その玉と下の玉を下枠へ
+    }
+    render();
+  }
+
+  function applyTap(p) {
+    const i = Math.floor((p.x - FX) / S);
+    if (i < 0 || i >= RODS) return false;
+    const s = getVal(places[i]);
+    if (p.y >= T0 - FT && p.y <= B0) {
+      // 5玉: 上半分→はりへ（5を入れる）、下半分→上枠へ（5を払う）
+      s.h = p.y < (T0 + B0) / 2 ? 1 : 0;
+    } else if (p.y >= B1 && p.y <= F1 + FT) {   // 下端の玉のために下枠まで反応させる
+      // 一玉: タップ位置より上にある玉ははりへ、下にある玉は下枠へ
+      let k = 0;
+      for (let bi = 0; bi < 4; bi++) if (earthTop(bi, s.n) + H / 2 < p.y) k++;
+      s.n = k;
+    } else return false;
+    render();
+    return true;
+  }
+
+  // 桁の増減
+  const $ = id => document.getElementById(id);
+  function updateControls() {
+    $("int-out").textContent = `${intDigits}桁`;
+    $("dec-out").textContent = `${decDigits}桁`;
+    $("int-minus").disabled = intDigits <= INT_MIN;
+    $("int-plus").disabled = intDigits >= INT_MAX;
+    $("dec-minus").disabled = decDigits <= DEC_MIN;
+    $("dec-plus").disabled = decDigits >= DEC_MAX;
+    try { localStorage.setItem("soroban-digits", JSON.stringify({ i: intDigits, d: decDigits })); } catch (_) {}
+  }
+  const change = (which, delta) => () => {
+    if (which === "int") intDigits = Math.min(INT_MAX, Math.max(INT_MIN, intDigits + delta));
+    else decDigits = Math.min(DEC_MAX, Math.max(DEC_MIN, decDigits + delta));
+    build();
+    if (mode === "quiz") startSet();
+  };
+  $("int-minus").addEventListener("click", change("int", -1));
+  $("int-plus").addEventListener("click", change("int", +1));
+  $("dec-minus").addEventListener("click", change("dec", -1));
+  $("dec-plus").addEventListener("click", change("dec", +1));
+  $("reset").addEventListener("click", resetAll);
+
+  // 設定画面
+  const settingsEl = $("settings");
+  const openSettings = () => { settingsEl.hidden = false; $("close-settings").focus(); };
+  const closeSettings = () => { settingsEl.hidden = true; $("open-settings").focus(); };
+  $("open-settings").addEventListener("click", openSettings);
+  $("close-settings").addEventListener("click", closeSettings);
+  settingsEl.addEventListener("click", e => { if (e.target === settingsEl) closeSettings(); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && !settingsEl.hidden) closeSettings(); });
+
+  function bindSeg(id, get, set) {
+    const seg = $(id);
+    const sync = () => seg.querySelectorAll("button").forEach(b =>
+      b.setAttribute("aria-pressed", b.dataset.v === get() ? "true" : "false"));
+    seg.addEventListener("click", e => {
+      const b = e.target.closest("button");
+      if (!b) return;
+      set(b.dataset.v);
+      sync();
+    });
+    sync();
+  }
+  bindSeg("seg-sound", () => (soundOn ? "on" : "off"), v => {
+    soundOn = v === "on";
+    try { localStorage.setItem("soroban-sound", soundOn ? "on" : "off"); } catch (_) {}
+    if (soundOn) { ensureAudio(); playClack(1); }
+  });
+  bindSeg("seg-sparkle", () => sparkleLevel, v => {
+    sparkleLevel = v;
+    try { localStorage.setItem("soroban-sparkle", v); } catch (_) {}
+  });
+  $("seg-color").innerHTML = Object.entries(THEMES).map(([k, t]) =>
+    `<button type="button" data-v="${k}"><span class="dot" style="background:${t.sw}"></span>${t.label}</button>`).join("");
+  bindSeg("seg-color", () => colorKey, v => {
+    if (!THEMES[v]) return;
+    colorKey = v;
+    try { localStorage.setItem("soroban-color", v); } catch (_) {}
+    applyTheme();
+    build();
+  });
+
+  // ===== 赤丸ビジュアル =====
+  const vizWrap = $("viz-wrap"), vizCanvas = $("viz-canvas"), legendEl = $("legend");
+  const RED = "#e0362f", RED_EDGE = "#a8231e";
+  // 0:5のまとまり 1:10 2:100 3:1000 …
+  const LEVEL_COLORS = ["#ffe27a", "#ffbfd2", "#d8c4f2", "#b9e0f5", "#c6ebbd", "#f6cfa6", "#c3cdee", "#ece39c", "#e3c0dc", "#cfe9e4"];
+  const LEVEL_NAMES = ["5", "10", "100", "1000", "1万", "10万", "100万", "1000万", "1億", "10億"];
+  let lastN = 0, lastTenth = 0;
+
+  const sizeOf = n => {
+    n.w = n.cols * n.child.w + (n.cols - 1) * n.gap + 2 * n.pad;
+    n.h = n.rows * n.child.h + (n.rows - 1) * n.gap + 2 * n.pad;
+    return n;
+  };
+  // 入れ物（レベルL = 10^L個分）の形を作る。内側は正方形寄り、一番外はパネルの形に合わせる
+  function buildTree(L, cw, ch) {
+    const DOT = { dot: true, cap: 1, w: 1, h: 1 };
+    const five = sizeOf({ cap: 5, cols: 5, rows: 1, child: DOT, pad: 0.1, gap: 0, color: LEVEL_COLORS[0] });
+    let node = sizeOf({ cap: 10, cols: 1, rows: 2, child: five, pad: 0.14, gap: 0.1, color: LEVEL_COLORS[1] });
+    for (let k = 2; k <= L; k++) {
+      const child = node, g = 0.14 * Math.min(child.w, child.h);
+      const opts = [[5, 2], [2, 5]].map(([cols, rows]) =>
+        sizeOf({ cap: child.cap * 10, cols, rows, child, gap: g, pad: g * 0.8, color: LEVEL_COLORS[k] }));
+      if (k < L) node = opts.sort((a, b) => Math.abs(Math.log(a.w / a.h)) - Math.abs(Math.log(b.w / b.h)))[0];
+      else node = opts.sort((a, b) => Math.min(cw / b.w, ch / b.h) - Math.min(cw / a.w, ch / a.h))[0];
+    }
+    return node;
+  }
+
+  function rr(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x, y, w, h, r); else ctx.rect(x, y, w, h);
+  }
+
+  function drawNode(ctx, n, x, y, count, u, ring) {
+    if (n.dot) {
+      ctx.beginPath();
+      ctx.arc(x + u / 2, y + u / 2, u * 0.38, 0, Math.PI * 2);
+      if (count >= 1) {
+        ctx.fillStyle = RED; ctx.fill();
+        if (u >= 10) { ctx.lineWidth = Math.max(1, u * 0.04); ctx.strokeStyle = RED_EDGE; ctx.stroke(); }
+      } else if (u >= 6) {
+        ctx.lineWidth = Math.max(1, u * 0.04); ctx.strokeStyle = ring; ctx.stroke();
+      }
+      return;
+    }
+    if (count <= 0 && u < 6) return;
+    const full = count >= n.cap;
+    if (full) {
+      rr(ctx, x, y, n.w * u, n.h * u, Math.max(2, n.pad * u * 1.2));
+      ctx.fillStyle = n.color; ctx.fill();
+      if (Math.min(n.child.w, n.child.h) * u < 3) {
+        // 小さすぎて玉が描けないときは、中を赤で塗りつぶす
+        ctx.globalAlpha = 0.85;
+        ctx.fillStyle = RED;
+        ctx.fillRect(x + n.pad * u, y + n.pad * u, (n.w - 2 * n.pad) * u, (n.h - 2 * n.pad) * u);
+        ctx.globalAlpha = 1;
+        return;
+      }
+    }
+    const c = n.child;
+    for (let i = 0; i < n.cols * n.rows; i++) {
+      const col = i % n.cols, row = Math.floor(i / n.cols);
+      const cnt = Math.max(0, Math.min(c.cap, count - i * c.cap));
+      drawNode(ctx, c, x + (n.pad + col * (c.w + n.gap)) * u, y + (n.pad + row * (c.h + n.gap)) * u, cnt, u, ring);
+    }
+  }
+
+  function slotXY(n, idx, x, y, u) {
+    if (n.dot) return [x + u / 2, y + u / 2];
+    const c = n.child, i = Math.floor(idx / c.cap);
+    const col = i % n.cols, row = Math.floor(i / n.cols);
+    return slotXY(c, idx - i * c.cap, x + (n.pad + col * (c.w + n.gap)) * u, y + (n.pad + row * (c.h + n.gap)) * u, u);
+  }
+
+  // 0.1の位：丸を10分割し、36°ずつ赤くする
+  function drawPie(ctx, cx, cy, r, tenth) {
+    ctx.lineWidth = Math.max(1, r * 0.06);
+    ctx.strokeStyle = "rgba(168,35,30,0.35)";
+    for (let k = 0; k < 10; k++) {
+      const a = -Math.PI / 2 + k * Math.PI / 5;
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + r * Math.cos(a), cy + r * Math.sin(a)); ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + tenth * Math.PI / 5);
+    ctx.closePath();
+    ctx.fillStyle = RED; ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.strokeStyle = RED_EDGE; ctx.stroke();
+  }
+
+  function drawViz(N, tenth) {
+    lastN = N; lastTenth = tenth;
+    const need = N + (tenth > 0 ? 1 : 0);
+    let L = 1;
+    while (10 ** L < need) L++;
+
+    const cw = vizWrap.clientWidth, ch = vizWrap.clientHeight;
+    if (cw > 0 && ch > 0) {
+      const dpr = window.devicePixelRatio || 1;
+      vizCanvas.width = Math.round(cw * dpr);
+      vizCanvas.height = Math.round(ch * dpr);
+      const ctx = vizCanvas.getContext("2d");
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, cw, ch);
+      const m = 4;
+      const tree = buildTree(L, cw - 2 * m, ch - 2 * m);
+      const u = Math.min((cw - 2 * m) / tree.w, (ch - 2 * m) / tree.h);
+      const x0 = (cw - tree.w * u) / 2, y0 = (ch - tree.h * u) / 2;
+      const ring = (getComputedStyle(document.documentElement).getPropertyValue("--plate-line") || "#ddd").trim();
+      drawNode(ctx, tree, x0, y0, N, u, ring);
+      if (tenth > 0) {
+        const [px, py] = slotXY(tree, N, x0, y0, u);
+        drawPie(ctx, px, py, u * 0.38, tenth);
+      }
+      // 凡例（玉が小さいときは0.1の位の丸を拡大表示）
+      let html = "";
+      for (let k = 0; k <= Math.max(1, L); k++) {
+        html += `<span><span class="sw" style="background:${LEVEL_COLORS[k]}"></span>${LEVEL_NAMES[k]}</span>`;
+      }
+      if (tenth > 0 && u < 24) html += `<span id="pie-box"><canvas id="pie-canvas" width="56" height="56"></canvas>0.${tenth}</span>`;
+      legendEl.innerHTML = html;
+      const pc = document.getElementById("pie-canvas");
+      if (pc) drawPie(pc.getContext("2d"), 28, 28, 25, tenth);
+    }
+  }
+
+  if (window.ResizeObserver) new ResizeObserver(() => drawViz(lastN, lastTenth)).observe(vizWrap);
+  else window.addEventListener("resize", () => drawViz(lastN, lastTenth));
+
+  // ===== 問題モード =====
+  let mode = "basic";
+  try { if (localStorage.getItem("soroban-mode") === "quiz") mode = "quiz"; } catch (_) {}
+  const QUIZ_TOTAL = 5;
+  const quiz = { I: 0, decs: [], str: "", lastStr: "", count: 0, elapsed: 0, qStart: 0, solved: false, finished: false, hold: null, ticker: null };
+  const quizBar = $("quiz-bar"), vizSection = $("viz");
+  const qNum = $("q-number"), qCount = $("q-count"), qTime = $("q-time");
+  const rand = n => Math.floor(Math.random() * n);
+  const fmtTime = ms => { const s = Math.floor(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
+  const fmtTimeJa = ms => { const s = Math.round(ms / 1000), m = Math.floor(s / 60); return (m ? `${m}ふん` : "") + `${s % 60}びょう`; };
+  const targetDigit = p => (p >= 0 ? Math.floor(quiz.I / 10 ** p) % 10 : (quiz.decs[-p - 1] || 0));
+
+  // いろいろな大きさ：まず桁数を選んでからその桁の数を作る
+  function genTarget() {
+    for (let tries = 0; tries < 50; tries++) {
+      const k = 1 + rand(intDigits);
+      const I = k === 1 ? rand(10) : 10 ** (k - 1) + rand(9 * 10 ** (k - 1));
+      let decs = Array.from({ length: decDigits }, () => rand(10));
+      if (decDigits && Math.random() < 0.4) decs = decs.map(() => 0);   // 小数なしの問題もまぜる
+      const d = decs.slice();
+      while (d.length && d[d.length - 1] === 0) d.pop();
+      const str = String(I) + (d.length ? "." + d.join("") : "");
+      if ((I === 0 && !d.length) || str === quiz.lastStr) continue;
+      quiz.I = I; quiz.decs = decs; quiz.str = str; quiz.lastStr = str;
+      return;
+    }
+  }
+  function updateBar() {
+    qNum.textContent = quiz.str;
+    qCount.textContent = `${Math.min(quiz.count + (quiz.solved ? 0 : 1), QUIZ_TOTAL)} / ${QUIZ_TOTAL}もん`;
+    qTime.textContent = fmtTime(quiz.elapsed + (quiz.solved ? 0 : performance.now() - quiz.qStart));
+  }
+  function newQuestion() {
+    clearTimeout(quiz.hold); quiz.hold = null;
+    genTarget();
+    quiz.solved = false;
+    values.clear();
+    build();
+    quiz.qStart = performance.now();
+    updateBar();
+  }
+  function startSet() {
+    quiz.count = 0; quiz.elapsed = 0; quiz.finished = false;
+    newQuestion();
+  }
+  function isCorrect() {
+    return places.every(p => { const s = getVal(p); return s.h * 5 + s.n === targetDigit(p); });
+  }
+  // そろえたら少しだけ待ってから正解にする（通り過ぎただけのときは数えない）
+  function checkQuiz() {
+    if (mode !== "quiz" || quiz.solved || !quiz.str) return;
+    if (isCorrect()) {
+      if (!quiz.hold) quiz.hold = setTimeout(() => { quiz.hold = null; if (!quiz.solved && isCorrect()) onSolved(); }, 450);
+    } else { clearTimeout(quiz.hold); quiz.hold = null; }
+  }
+  function onSolved() {
+    quiz.solved = true;
+    quiz.elapsed += performance.now() - quiz.qStart;
+    quiz.count++;
+    quiz.finished = quiz.count >= QUIZ_TOTAL;
+    svg.classList.remove("hide-answer");
+    updateBar();
+    celebrate(quiz.finished);
+  }
+  function applyMode() {
+    const q = mode === "quiz";
+    quizBar.hidden = !q;
+    vizSection.hidden = q;
+    clearInterval(quiz.ticker); quiz.ticker = null;
+    if (q) {
+      quiz.ticker = setInterval(() => { if (!quiz.solved && mode === "quiz") updateBar(); }, 500);
+      startSet();
+    } else {
+      clearTimeout(quiz.hold); quiz.hold = null;
+      render();
+    }
+  }
+  bindSeg("seg-mode", () => mode, v => {
+    if (v === mode) return;
+    mode = v;
+    try { localStorage.setItem("soroban-mode", v); } catch (_) {}
+    applyMode();
+  });
+
+  // ===== 正解の演出：花丸と打ち上げ花火 =====
+  const celEl = $("celebrate"), fwCanvas = $("fw"), hanaSvg = $("hanamaru");
+  let celReady = false, fwRaf = 0, fwTimers = [];
+
+  function drawHanamaru() {
+    const c = 200;
+    let sp = "";
+    const turns = 2.6, steps = 150;
+    for (let k = 0; k <= steps; k++) {
+      const t = k / steps, a = -Math.PI / 2 + t * turns * Math.PI * 2, r = 10 + t * 88;
+      sp += (k ? "L" : "M") + (c + r * Math.cos(a)).toFixed(1) + "," + (c + r * Math.sin(a)).toFixed(1);
+    }
+    const n = 12, R = 140, rr = R * Math.sin(Math.PI / n) * 1.12;
+    let pd = "";
+    for (let k = 0; k <= n; k++) {
+      const a = -Math.PI / 2 + k * 2 * Math.PI / n;
+      const x = (c + R * Math.cos(a)).toFixed(1), y = (c + R * Math.sin(a)).toFixed(1);
+      pd += k ? `A${rr.toFixed(1)},${rr.toFixed(1)} 0 0 1 ${x},${y}` : `M${x},${y}`;
+    }
+    const line = 'fill="none" stroke="#ff3358" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"';
+    hanaSvg.innerHTML =
+      `<path id="hm-fill" d="${pd}Z" fill="#ffe3ea" opacity="0"/>` +
+      `<path class="hm-line" d="${sp}" ${line}/>` +
+      `<path class="hm-line" d="${pd}" ${line}/>`;
+    if (!hanaSvg.animate) return;
+    hanaSvg.animate([
+      { transform: "scale(0.4) rotate(-25deg)", opacity: 0 },
+      { transform: "scale(1.07) rotate(4deg)", opacity: 1, offset: 0.6 },
+      { transform: "scale(1) rotate(0deg)", opacity: 1 }
+    ], { duration: 600, easing: "ease-out" });
+    const lines = hanaSvg.querySelectorAll(".hm-line");
+    lines.forEach((p, k) => {
+      const len = p.getTotalLength();
+      p.style.strokeDasharray = len;
+      p.style.strokeDashoffset = len;
+      p.animate([{ strokeDashoffset: len }, { strokeDashoffset: 0 }],
+        { duration: k ? 750 : 600, delay: k ? 550 : 0, easing: "ease-in-out", fill: "forwards" });
+    });
+    hanaSvg.querySelector("#hm-fill").animate([{ opacity: 0 }, { opacity: 0.95 }], { duration: 400, delay: 1150, fill: "forwards" });
+  }
+
+  const FW_COLORS = ["#ff4d6d", "#ffd23f", "#4dd0ff", "#a77bff", "#5cff9d", "#ff8a3d", "#ffffff", "#ff7ad9"];
+  let boomBuf = null;
+  function boomSound() {
+    if (!soundOn || !actx) return;
+    try {
+      if (!boomBuf) {
+        const len = Math.floor(actx.sampleRate * 0.7);
+        boomBuf = actx.createBuffer(1, len, actx.sampleRate);
+        const d = boomBuf.getChannelData(0);
+        for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.5);
+      }
+      const t = actx.currentTime;
+      const src = actx.createBufferSource(); src.buffer = boomBuf;
+      const lp = actx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 500 + Math.random() * 400;
+      const g = actx.createGain(); g.gain.setValueAtTime(0.5, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.65);
+      src.connect(lp); lp.connect(g); g.connect(actx.destination);
+      src.start(t); src.stop(t + 0.7);
+      for (let k = 0; k < 5; k++) clack(t + 0.15 + Math.random() * 0.35, 0.12);   // パチパチ
+    } catch (_) {}
+  }
+  function fanfare(big) {
+    if (!soundOn || !actx) return;
+    try {
+      const notes = big ? [523.25, 659.25, 783.99, 1046.5, 783.99, 1046.5] : [523.25, 659.25, 783.99, 1046.5];
+      const durs = big ? [0.12, 0.12, 0.12, 0.24, 0.12, 0.55] : [0.11, 0.11, 0.11, 0.45];
+      let t = actx.currentTime + 0.05;
+      notes.forEach((f, i) => {
+        const o = actx.createOscillator(); o.type = "triangle"; o.frequency.value = f;
+        const g = actx.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.3, t + 0.015);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + durs[i] + 0.1);
+        o.connect(g); g.connect(actx.destination);
+        o.start(t); o.stop(t + durs[i] + 0.12);
+        t += durs[i];
+      });
+    } catch (_) {}
+  }
+  function stopFireworks() {
+    cancelAnimationFrame(fwRaf);
+    fwTimers.forEach(clearTimeout); fwTimers = [];
+    const ctx = fwCanvas.getContext("2d");
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, fwCanvas.width, fwCanvas.height);
+  }
+  function fireworks(count) {
+    stopFireworks();
+    const ctx = fwCanvas.getContext("2d");
+    const dpr = window.devicePixelRatio || 1;
+    const Wc = fwCanvas.clientWidth, Hc = fwCanvas.clientHeight;
+    fwCanvas.width = Math.round(Wc * dpr); fwCanvas.height = Math.round(Hc * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const sc = Math.max(0.6, Math.min(Wc, Hc) / 600);
+    const rockets = [], parts = [];
+    let pending = count;
+    for (let k = 0; k < count; k++) {
+      fwTimers.push(setTimeout(() => {
+        pending--;
+        const ty = Hc * (0.12 + Math.random() * 0.3);
+        rockets.push({ x: Wc * (0.12 + Math.random() * 0.76), y: Hc + 10, ty, vy: -(Hc + 10 - ty) / 40, color: pick(FW_COLORS) });
+      }, k * 280 + Math.random() * 150));
+    }
+    function explode(r) {
+      const n = 60 + rand(40), c2 = pick(FW_COLORS);
+      for (let k = 0; k < n; k++) {
+        const a = Math.random() * Math.PI * 2, s = (1.8 + Math.random() * 3.6) * sc * 1.3;
+        parts.push({ x: r.x, y: r.y, px: r.x, py: r.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s,
+          life: 1, decay: 0.011 + Math.random() * 0.012, color: Math.random() < 0.7 ? r.color : c2 });
+      }
+      boomSound();
+    }
+    const step = () => {
+      ctx.clearRect(0, 0, Wc, Hc);
+      ctx.lineCap = "round";
+      for (let i = rockets.length - 1; i >= 0; i--) {
+        const r = rockets[i];
+        r.y += r.vy; r.vy *= 0.985;
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = r.color; ctx.lineWidth = 3 * sc;
+        ctx.beginPath(); ctx.moveTo(r.x, r.y + 16 * sc); ctx.lineTo(r.x, r.y); ctx.stroke();
+        if (r.y <= r.ty || r.vy > -1) { explode(r); rockets.splice(i, 1); }
+      }
+      for (let i = parts.length - 1; i >= 0; i--) {
+        const p = parts[i];
+        p.px = p.x; p.py = p.y;
+        p.x += p.vx; p.y += p.vy;
+        p.vx *= 0.982; p.vy = p.vy * 0.982 + 0.055 * sc;
+        p.life -= p.decay;
+        if (p.life <= 0) { parts.splice(i, 1); continue; }
+        ctx.globalAlpha = Math.min(1, p.life * 1.3);
+        ctx.strokeStyle = p.color; ctx.lineWidth = 2.6 * sc;
+        ctx.beginPath(); ctx.moveTo(p.px, p.py); ctx.lineTo(p.x, p.y); ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      if (pending > 0 || rockets.length || parts.length) fwRaf = requestAnimationFrame(step);
+    };
+    fwRaf = requestAnimationFrame(step);
+  }
+
+  // ===== シールとシールちょう =====
+  const star5 = (cx, cy, R, r) => Array.from({ length: 10 }, (_, k) => {
+    const a = -Math.PI / 2 + k * Math.PI / 5, rr = k % 2 ? r : R;
+    return `${(cx + rr * Math.cos(a)).toFixed(1)},${(cy + rr * Math.sin(a)).toFixed(1)}`;
+  }).join(" ");
+  const STICKERS = [
+    `<polygon points="${star5(50, 53, 42, 18)}" fill="#ffd23f" stroke="#f0a500" stroke-width="2"/>`,
+    `<path d="M50 86C20 64 8 46 14 30C20 14 42 12 50 28C58 12 80 14 86 30C92 46 80 64 50 86Z" fill="#ff5c8a"/><ellipse cx="32" cy="32" rx="7" ry="4" fill="#ffffff" opacity=".7" transform="rotate(-30 32 32)"/>`,
+    [0, 1, 2, 3, 4].map(k => { const a = -Math.PI / 2 + k * 2 * Math.PI / 5; return `<circle cx="${(50 + 22 * Math.cos(a)).toFixed(1)}" cy="${(50 + 22 * Math.sin(a)).toFixed(1)}" r="17" fill="#ffa8cf"/>`; }).join("") + `<circle cx="50" cy="50" r="13" fill="#ffd23f"/>`,
+    `<path d="M50 52 Q56 74 66 88" fill="none" stroke="#2f8f46" stroke-width="5" stroke-linecap="round"/><circle cx="36" cy="36" r="16" fill="#4cc46a"/><circle cx="64" cy="36" r="16" fill="#4cc46a"/><circle cx="36" cy="62" r="16" fill="#4cc46a"/><circle cx="64" cy="62" r="16" fill="#4cc46a"/>`,
+    `<path d="M14 74L20 30L36 52L50 22L64 52L80 30L86 74Z" fill="#ffcc33" stroke="#e0a100" stroke-width="2" stroke-linejoin="round"/><rect x="14" y="70" width="72" height="12" rx="3" fill="#f0b400"/><circle cx="50" cy="76" r="5" fill="#ff4d6d"/><circle cx="30" cy="76" r="4" fill="#4dd0ff"/><circle cx="70" cy="76" r="4" fill="#4dd0ff"/>`,
+    `<path d="M50 30C50 18 60 12 70 12" fill="none" stroke="#2f8f46" stroke-width="4" stroke-linecap="round"/><path d="M50 30C44 44 36 52 34 56M50 30C56 44 62 50 66 54" fill="none" stroke="#2f8f46" stroke-width="4" stroke-linecap="round"/><circle cx="34" cy="68" r="16" fill="#e8262c"/><circle cx="66" cy="66" r="16" fill="#e8262c"/><circle cx="29" cy="62" r="4" fill="#ffffff" opacity=".7"/><circle cx="61" cy="60" r="4" fill="#ffffff" opacity=".7"/>`,
+    `<path d="M12 72A38 38 0 0 1 88 72" fill="none" stroke="#ff4d4d" stroke-width="8"/><path d="M20 72A30 30 0 0 1 80 72" fill="none" stroke="#ffb13d" stroke-width="8"/><path d="M28 72A22 22 0 0 1 72 72" fill="none" stroke="#ffe14d" stroke-width="8"/><path d="M36 72A14 14 0 0 1 64 72" fill="none" stroke="#4dc4ff" stroke-width="8"/><circle cx="16" cy="74" r="9" fill="#ffffff" stroke="#d8e6f0" stroke-width="2"/><circle cx="84" cy="74" r="9" fill="#ffffff" stroke="#d8e6f0" stroke-width="2"/>`,
+    `<path d="M60 12A38 38 0 1 0 88 66A30 30 0 1 1 60 12Z" fill="#ffd23f" stroke="#f0a500" stroke-width="2"/><polygon points="${star5(76, 26, 9, 4)}" fill="#fff3a6"/>`
+  ];
+  const stickerSVG = i => `<svg class="sticker" viewBox="0 0 100 100" aria-hidden="true"><g class="st-outline">${STICKERS[i]}</g>${STICKERS[i]}</svg>`;
+  const dkey = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  function loadStickers() {
+    try { const a = JSON.parse(localStorage.getItem("soroban-stickers") || "[]"); return Array.isArray(a) ? a : []; } catch (_) { return []; }
+  }
+  function awardSticker() {
+    const list = loadStickers();
+    const s = rand(STICKERS.length);
+    list.push({ d: dkey(new Date()), s });
+    try { localStorage.setItem("soroban-stickers", JSON.stringify(list)); } catch (_) {}
+    return { s, today: list.filter(x => x.d === dkey(new Date())).length };
+  }
+
+  const bookEl = $("book");
+  let bookMonth = new Date(); bookMonth.setDate(1);
+  function renderBook() {
+    const list = loadStickers();
+    const byDay = {};
+    list.forEach(x => { (byDay[x.d] = byDay[x.d] || []).push(x.s); });
+    const todayKey = dkey(new Date());
+    const tc = (byDay[todayKey] || []).length;
+    $("book-today").innerHTML = tc ? `きょうは<b>${tc}</b>セット クリア！` : "きょうのシールは まだないよ。もんだいモードで5もん とこう！";
+    const y = bookMonth.getFullYear(), m = bookMonth.getMonth();
+    $("m-label").textContent = `${y}ねん ${m + 1}がつ`;
+    const now = new Date();
+    $("m-next").disabled = y > now.getFullYear() || (y === now.getFullYear() && m >= now.getMonth());
+    let html = ["にち", "げつ", "か", "すい", "もく", "きん", "ど"]
+      .map((w, k) => `<div class="wd${k === 0 ? " sun" : k === 6 ? " sat" : ""}">${w}</div>`).join("");
+    const first = new Date(y, m, 1).getDay(), days = new Date(y, m + 1, 0).getDate();
+    for (let k = 0; k < first; k++) html += `<div class="day blank"></div>`;
+    for (let d = 1; d <= days; d++) {
+      const date = new Date(y, m, d), key = dkey(date), wd = date.getDay();
+      const st = byDay[key] || [];
+      const shown = st.slice(0, 4).map(stickerSVG).join("");
+      const more = st.length > 4 ? `<span class="more">+${st.length - 4}</span>` : "";
+      html += `<div class="day${wd === 0 ? " sun" : wd === 6 ? " sat" : ""}${key === todayKey ? " today" : ""}"><span class="n">${d}</span><span class="stk">${shown}${more}</span></div>`;
+    }
+    $("cal").innerHTML = html;
+    $("book-total").textContent = `ぜんぶで ${list.length}まい`;
+  }
+  $("open-book").addEventListener("click", () => {
+    bookMonth = new Date(); bookMonth.setDate(1);
+    renderBook();
+    bookEl.hidden = false;
+    $("close-book").focus();
+  });
+  const closeBook = () => { bookEl.hidden = true; $("open-book").focus(); };
+  $("close-book").addEventListener("click", closeBook);
+  bookEl.addEventListener("click", e => { if (e.target === bookEl) closeBook(); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && !bookEl.hidden) closeBook(); });
+  $("m-prev").addEventListener("click", () => { bookMonth.setMonth(bookMonth.getMonth() - 1); renderBook(); });
+  $("m-next").addEventListener("click", () => { bookMonth.setMonth(bookMonth.getMonth() + 1); renderBook(); });
+
+  function celebrate(final) {
+    const stEl = $("cel-sticker");
+    if (final) {
+      const got = awardSticker();
+      $("cel-title").textContent = `${QUIZ_TOTAL}もん クリア！`;
+      $("cel-sub").textContent = `シールゲット！（きょう ${got.today}まいめ）　じかん ${fmtTimeJa(quiz.elapsed)}\nタップでもういちど`;
+      stEl.innerHTML = stickerSVG(got.s);
+      stEl.hidden = false;
+      if (stEl.animate) stEl.animate([
+        { transform: "scale(0) rotate(-40deg)", opacity: 0 },
+        { transform: "scale(1.25) rotate(10deg)", opacity: 1, offset: 0.6 },
+        { transform: "scale(1) rotate(8deg)", opacity: 1 }
+      ], { duration: 550, delay: 1400, easing: "ease-out", fill: "both" });
+    } else {
+      $("cel-title").textContent = "せいかい！";
+      $("cel-sub").textContent = "タップでつぎのもんだい";
+      stEl.hidden = true;
+    }
+    celEl.hidden = false;
+    celReady = false;
+    setTimeout(() => { celReady = true; }, 700);
+    drawHanamaru();
+    ensureAudio();
+    fanfare(final);
+    if (!REDUCED) fireworks(final ? 14 : 7);
+  }
+  celEl.addEventListener("pointerup", () => {
+    if (!celReady) return;
+    celEl.hidden = true;
+    stopFireworks();
+    if (quiz.finished) startSet(); else newQuestion();
+  });
+
+  build();
+  if (mode === "quiz") applyMode();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => render());
+})();
+</script>
+
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+}
+</script>
+</body>
+</html>
