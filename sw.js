@@ -1,5 +1,5 @@
 // 更新したときは VERSION の数字を上げてください
-const VERSION = "soroban-v7";
+const VERSION = "soroban-v8";
 const CORE = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {

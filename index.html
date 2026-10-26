@@ -125,12 +125,56 @@ svg#abacus { width: 100%; flex: 1 1 0; min-height: 0; touch-action: none; displa
 
 /* 問題モード */
 .quiz-bar { display: flex; align-items: center; gap: 12px; padding-block: 0 6px; }
-.q-count, .q-time { font-size: 0.95rem; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 5.5em; }
-.q-time { text-align: right; }
+.q-pick {
+  font: 700 0.95rem/1.25 var(--font); background: var(--btn); color: var(--btn-fg);
+  border: 0; border-radius: 14px; padding: 8px 12px; cursor: pointer; max-width: 8.5em; flex: none;
+}
+.q-pick::after { content: " \25BE"; }
+.q-meta {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex: none; min-width: 5.5em;
+  font-size: 0.95rem; color: var(--muted); font-variant-numeric: tabular-nums;
+}
+#q-time.warn { color: #d6455a; font-weight: 700; }
 .q-number {
-  flex: 1; min-width: 0; text-align: center;
-  font: 700 clamp(2rem, 8vh, 3.6rem)/1.15 var(--font); letter-spacing: 0.1em; font-variant-numeric: tabular-nums;
+  flex: 1; min-width: 0; text-align: center; white-space: nowrap; overflow: hidden;
+  font: 700 clamp(1.8rem, 8vh, 3.4rem)/1.2 var(--font); letter-spacing: 0.06em; font-variant-numeric: tabular-nums;
   color: var(--fg); background: var(--plate); border: 2px solid var(--plate-line); border-radius: 16px; padding: 2px 16px;
+}
+
+/* もんだいを えらぶ */
+.picker-sheet { width: min(860px, 100%); }
+.p-row {
+  display: grid; grid-template-columns: 9.5em minmax(0, 1fr) 13em; align-items: center; gap: 8px 12px;
+  padding-block: 10px; border-top: 1px solid var(--plate-line);
+}
+.p-name { font-weight: 700; font-size: 1.02rem; }
+.p-levels { display: flex; flex-wrap: wrap; gap: 6px; }
+.p-levels button {
+  font: 700 0.95rem var(--font); min-width: 3.6em; padding: 8px 10px; cursor: pointer;
+  border-radius: 12px; border: 2px solid var(--step); background: transparent; color: var(--fg);
+  display: inline-flex; align-items: center; justify-content: center; gap: 3px;
+}
+.p-levels button[aria-pressed="true"] { background: var(--btn); border-color: var(--btn); color: var(--btn-fg); }
+.p-levels button:disabled { cursor: default; color: var(--muted); border-style: dashed; }
+.p-status { font-size: 0.85rem; color: var(--muted); min-width: 0; }
+.prog { display: flex; align-items: center; gap: 8px; }
+.prog .bar { flex: 1; min-width: 3em; height: 8px; border-radius: 99px; background: var(--step); overflow: hidden; }
+.prog .bar i { display: block; height: 100%; background: var(--btn); }
+.test-btn {
+  font: 700 0.92rem var(--font); background: #ffcc33; color: #4a3300; cursor: pointer;
+  border: 0; border-radius: 12px; padding: 9px 12px; box-shadow: 0 2px 0 #d9a400;
+}
+.done { font-weight: 700; color: var(--btn); }
+@media (max-width: 700px) { .p-row { grid-template-columns: minmax(0, 1fr); } }
+
+/* しんきゅうテスト */
+.test-sheet { width: min(500px, 100%); text-align: center; }
+.test-sheet h2 { margin: 4px 0 0; font-size: 1.5rem; letter-spacing: 0.12em; }
+.test-msg { white-space: pre-line; font-size: 1.12rem; line-height: 1.75; margin: 10px 0 18px; }
+.test-actions { display: flex; justify-content: center; align-items: center; gap: 12px; flex-wrap: wrap; }
+.big-btn {
+  font: 700 1.2rem var(--font); letter-spacing: 0.08em; background: var(--btn); color: var(--btn-fg);
+  border: 0; border-radius: 999px; padding: 12px 34px; cursor: pointer;
 }
 .celebrate {
   position: fixed; inset: 0; z-index: 30; cursor: pointer;
@@ -234,6 +278,27 @@ svg#abacus { width: 100%; flex: 1 1 0; min-height: 0; touch-action: none; displa
   </div>
 </div>
 
+<div id="picker" class="overlay" hidden>
+  <div class="sheet picker-sheet" role="dialog" aria-modal="true" aria-labelledby="picker-title">
+    <div class="sheet-head">
+      <h2 id="picker-title">もんだいを えらぶ</h2>
+      <button id="close-picker" class="pill" type="button">とじる</button>
+    </div>
+    <div id="picker-list"></div>
+  </div>
+</div>
+
+<div id="test" class="overlay" hidden>
+  <div class="sheet test-sheet" role="dialog" aria-modal="true" aria-labelledby="test-title">
+    <h2 id="test-title">しんきゅうテスト</h2>
+    <p class="test-msg" id="test-msg"></p>
+    <div class="test-actions">
+      <button id="test-go" class="big-btn" type="button">スタート</button>
+      <button id="test-cancel" class="pill" type="button">やめる</button>
+    </div>
+  </div>
+</div>
+
 <div id="settings" class="overlay" hidden>
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="settings-title">
     <div class="sheet-head">
@@ -246,6 +311,14 @@ svg#abacus { width: 100%; flex: 1 1 0; min-height: 0; touch-action: none; displa
         <button type="button" data-v="basic">きほん</button>
         <button type="button" data-v="quiz">もんだい</button>
       </div>
+    </section>
+    <section class="set-row">
+      <h3>レベルのロック</h3>
+      <div class="seg" id="seg-lock" role="group" aria-label="レベルのロック">
+        <button type="button" data-v="on">あり</button>
+        <button type="button" data-v="off">なし</button>
+      </div>
+      <p class="note">「なし」にすると、テストに合格しなくても すべてのレベルを選べます（おとな用）</p>
     </section>
     <section class="set-row">
       <h3>桁数</h3>
@@ -289,6 +362,8 @@ svg#abacus { width: 100%; flex: 1 1 0; min-height: 0; touch-action: none; displa
       <ul>
         <li>玉をタップするか、上下にはじいて動かす</li>
         <li>はりを横に3けた以上なぞると御破算</li>
+        <li>もんだいモードでは、左上のボタンで しゅるいと レベルを えらぶ</li>
+        <li>5もんで シール1まい。おなじレベルで シール10まいになると しんきゅうテスト</li>
       </ul>
     </section>
   </div>
@@ -296,9 +371,9 @@ svg#abacus { width: 100%; flex: 1 1 0; min-height: 0; touch-action: none; displa
 <main>
   <div class="board">
     <div class="quiz-bar" id="quiz-bar" hidden>
-      <span class="q-count" id="q-count">1 / 5もん</span>
+      <button id="q-pick" class="q-pick" type="button">かずをおく</button>
       <div class="q-number" id="q-number" aria-live="polite">0</div>
-      <span class="q-time" id="q-time">0:00</span>
+      <div class="q-meta"><span id="q-count">1 / 5もん</span><span id="q-time">0:00</span></div>
     </div>
     <svg id="abacus" role="img" aria-label="そろばん 0" preserveAspectRatio="xMidYMid meet"></svg>
   </div>
@@ -398,6 +473,7 @@ svg#abacus { width: 100%; flex: 1 1 0; min-height: 0; touch-action: none; displa
 
   // 桁設定（前回の設定を覚えておく）
   let intDigits = 4, decDigits = 1;
+  let curInt = 4, curDec = 1;     // いま盤にある桁（計算問題では自動でふえる）
   try {
     const saved = JSON.parse(localStorage.getItem("soroban-digits") || "null");
     if (saved) {
@@ -592,11 +668,13 @@ svg#abacus { width: 100%; flex: 1 1 0; min-height: 0; touch-action: none; displa
 
   function build() {
     // 範囲外になった位の値は捨てる
-    for (const p of [...values.keys()]) if (p >= intDigits || p < -decDigits) values.delete(p);
+    const bs = boardSize();
+    curInt = bs.i; curDec = bs.d;
+    for (const p of [...values.keys()]) if (p >= curInt || p < -curDec) values.delete(p);
 
     places = [];
-    for (let p = intDigits - 1; p >= 0; p--) places.push(p);
-    for (let d = 1; d <= decDigits; d++) places.push(-d);
+    for (let p = curInt - 1; p >= 0; p--) places.push(p);
+    for (let d = 1; d <= curDec; d++) places.push(-d);
     RODS = places.length;
     W = FX * 2 + S * RODS;
 
@@ -657,8 +735,8 @@ svg#abacus { width: 100%; flex: 1 1 0; min-height: 0; touch-action: none; displa
     el("rect", { x: FX, y: DIGIT_Y, width: S * RODS, height: 76, rx: 14, class: "plate answer" }, svg);
     digitEls = places.map((_, i) =>
       el("text", { x: cx(i), y: DIGIT_Y + 60, "text-anchor": "middle", class: "digit answer" }, svg));
-    if (decDigits > 0) {
-      const dot = el("text", { x: FX + S * intDigits, y: DIGIT_Y + 60, "text-anchor": "middle", class: "digit answer" }, svg);
+    if (curDec > 0) {
+      const dot = el("text", { x: FX + S * curInt, y: DIGIT_Y + 60, "text-anchor": "middle", class: "digit answer" }, svg);
       dot.textContent = ".";
     }
     readingEl = el("text", { x: FX + S * RODS / 2, y: READ_Y, "text-anchor": "middle", class: "reading answer" }, svg);
@@ -684,12 +762,14 @@ svg#abacus { width: 100%; flex: 1 1 0; min-height: 0; touch-action: none; displa
       digitEls[i].textContent = d;
       v.push(d);
     });
-    const label = v.slice(0, intDigits).join("") + (decDigits ? "." + v.slice(intDigits).join("") : "");
+    const label = v.slice(0, curInt).join("") + (curDec ? "." + v.slice(curInt).join("") : "");
     svg.setAttribute("aria-label", `そろばん ${label}`);
     let N = 0;
     places.forEach((p, i) => { if (p >= 0) N += v[i] * 10 ** p; });
-    const tenth = decDigits ? v[intDigits] : 0;
-    readingEl.textContent = readNumber(N, v.slice(intDigits));
+    const tenth = curDec ? v[curInt] : 0;
+    // 計算問題に正解したあとは、答えの読み方を出す
+    const showAns = mode === "quiz" && quiz.solved && !quiz.failed && quiz.q && quiz.q.op !== "put";
+    readingEl.textContent = showAns ? readNumber(quiz.q.answer, []) : readNumber(N, v.slice(curInt));
     readingEl.removeAttribute("textLength");
     const maxW = S * RODS - 24;
     try {
@@ -820,8 +900,8 @@ svg#abacus { width: 100%; flex: 1 1 0; min-height: 0; touch-action: none; displa
   const change = (which, delta) => () => {
     if (which === "int") intDigits = Math.min(INT_MAX, Math.max(INT_MIN, intDigits + delta));
     else decDigits = Math.min(DEC_MAX, Math.max(DEC_MIN, decDigits + delta));
-    build();
-    if (mode === "quiz") startSet();
+    if (mode === "quiz" && quizType === "put" && !quiz.test) startSet();
+    else { if (mode === "quiz") values.clear(); build(); }
   };
   $("int-minus").addEventListener("click", change("int", -1));
   $("int-plus").addEventListener("click", change("int", +1));
@@ -849,6 +929,7 @@ svg#abacus { width: 100%; flex: 1 1 0; min-height: 0; touch-action: none; displa
       sync();
     });
     sync();
+    return sync;
   }
   bindSeg("seg-sound", () => (soundOn ? "on" : "off"), v => {
     soundOn = v === "on";
@@ -1002,17 +1083,205 @@ svg#abacus { width: 100%; flex: 1 1 0; min-height: 0; touch-action: none; displa
   // ===== 問題モード =====
   let mode = "basic";
   try { if (localStorage.getItem("soroban-mode") === "quiz") mode = "quiz"; } catch (_) {}
-  const QUIZ_TOTAL = 5;
-  const quiz = { I: 0, decs: [], str: "", lastStr: "", count: 0, elapsed: 0, qStart: 0, solved: false, finished: false, hold: null, ticker: null };
-  const quizBar = $("quiz-bar"), vizSection = $("viz");
-  const qNum = $("q-number"), qCount = $("q-count"), qTime = $("q-time");
-  const rand = n => Math.floor(Math.random() * n);
-  const fmtTime = ms => { const s = Math.floor(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
-  const fmtTimeJa = ms => { const s = Math.round(ms / 1000), m = Math.floor(s / 60); return (m ? `${m}ふん` : "") + `${s % 60}びょう`; };
-  const targetDigit = p => (p >= 0 ? Math.floor(quiz.I / 10 ** p) % 10 : (quiz.decs[-p - 1] || 0));
+  const SET_SIZE = 5, TEST_SIZE = 10, SETS_FOR_TEST = 10;
+  const TYPES = [
+    { k: "put", name: "かずをおく", short: "かずをおく" },
+    { k: "add", name: "たしざん", short: "たしざん" },
+    { k: "sub", name: "ひきざん", short: "ひきざん" },
+    { k: "addsub", name: "たしざん・ひきざん", short: "たし・ひき" },
+    { k: "mul", name: "かけざん", short: "かけざん" },
+    { k: "div", name: "わりざん", short: "わりざん" },
+    { k: "muldiv", name: "かけざん・わりざん", short: "かけ・わり" },
+    { k: "all", name: "ぜんぶ まぜる", short: "ぜんぶ" }
+  ];
+  const TYPE = Object.fromEntries(TYPES.map(t => [t.k, t]));
+  // レベルごとに使う整数のけた数（設定より少なければ自動でふやす）
+  //   掛け算：答えのけた＋1　割り算：割られる数のけた＋2（答えを左に立てる分）
+  const NEED = {
+    add: [2, 2, 2, 3, 5], sub: [2, 2, 2, 2, 4], addsub: [2, 2, 2, 3, 5],
+    mul: [3, 4, 5, 5, 6], div: [4, 4, 5, 6, 7], muldiv: [4, 4, 5, 6, 7], all: [4, 4, 5, 6, 7]
+  };
+  // しんきゅうテストの 1もんあたりの じかん（びょう）
+  const SEC = {
+    add: [10, 12, 15, 20, 30], sub: [10, 12, 15, 20, 30], addsub: [10, 12, 15, 20, 30],
+    mul: [10, 20, 30, 40, 60], div: [12, 25, 35, 50, 70]
+  };
 
-  // いろいろな大きさ：まず桁数を選んでからその桁の数を作る
-  function genTarget() {
+  // --- すすみぐあい ---
+  let progress = { unlock: {}, sets: {} };
+  try {
+    const p = JSON.parse(localStorage.getItem("soroban-progress") || "null");
+    if (p && typeof p.unlock === "object" && typeof p.sets === "object") progress = p;
+  } catch (_) {}
+  const saveProgress = () => { try { localStorage.setItem("soroban-progress", JSON.stringify(progress)); } catch (_) {} };
+  let noLock = false;
+  try { noLock = localStorage.getItem("soroban-nolock") === "on"; } catch (_) {}
+  const unlockedOf = k => Math.min(5, Math.max(1, progress.unlock[k] || 1));
+  const isOpen = (k, L) => noLock || L <= unlockedOf(k);
+  const setsOf = (k, L) => progress.sets[`${k}-${L}`] || 0;
+  const testReady = k => { const u = unlockedOf(k); return u < 5 && setsOf(k, u) >= SETS_FOR_TEST; };
+
+  let quizType = "put", quizLevel = 1;
+  try {
+    const sel = JSON.parse(localStorage.getItem("soroban-quizsel") || "null");
+    if (sel && TYPE[sel.t]) { quizType = sel.t; quizLevel = Math.min(5, Math.max(1, sel.l | 0)); }
+  } catch (_) {}
+  if (!isOpen(quizType, quizLevel)) quizLevel = unlockedOf(quizType);
+  const saveSel = () => { try { localStorage.setItem("soroban-quizsel", JSON.stringify({ t: quizType, l: quizLevel })); } catch (_) {} };
+
+  function boardSize() {
+    if (mode === "quiz" && quizType !== "put") {
+      return { i: Math.min(INT_MAX, Math.max(intDigits, NEED[quizType][quizLevel - 1])), d: 0 };
+    }
+    return { i: intDigits, d: decDigits };
+  }
+
+  const quiz = {
+    q: null, lastText: "", count: 0, total: SET_SIZE, elapsed: 0, qStart: 0, solved: false, finished: false,
+    hold: null, ticker: null, test: false, testQs: [], limit: 0, failed: false
+  };
+  const quizBar = $("quiz-bar"), vizSection = $("viz");
+  const qNum = $("q-number"), qCount = $("q-count"), qTime = $("q-time"), qPick = $("q-pick");
+  const rand = n => Math.floor(Math.random() * n);
+  const rnd = (a, b) => a + rand(Math.max(0, b - a + 1));
+  const nd = n => rnd(10 ** (n - 1), 10 ** n - 1);                       // n けたの数
+  const nz = n => { let x; do { x = nd(n); } while (x % 10 === 0); return x; };   // 1の位が0でない n けた
+  const fmtTime = ms => { const s = Math.floor(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
+  const fmtTimeJa = ms => { const s = Math.round(ms / 1000), m = Math.floor(s / 60); return (m ? `${m}ふん` : "") + (s % 60 || !m ? `${s % 60}びょう` : ""); };
+
+  // --- そろばんで たし・ひき するときに つかう わざ ---
+  //   direct:そのまま  five:5の合成・分解  ten:10の合成・分解（くりあがり・くりさがり）
+  //   combo:5と10の合わせわざ  chain:くりあがり・くりさがりが つづく
+  const beadsOf = v => [v >= 5 ? 1 : 0, v % 5];
+  function addAt(b, p, d, t, carry) {
+    const v = b[p] || 0;
+    if (v + d <= 9) {
+      const [h, n] = beadsOf(v), [dh, dn] = beadsOf(d);
+      t.add(n + dn <= 4 && h + dh <= 1 ? "direct" : "five");
+      b[p] = v + d;
+    } else {
+      const c = 10 - d, [h, n] = beadsOf(v), [ch, cn] = beadsOf(c);
+      t.add(n >= cn && h >= ch ? "ten" : "combo");
+      if (carry) t.add("chain");
+      b[p] = v - c;
+      addAt(b, p + 1, 1, t, true);
+    }
+  }
+  function subAt(b, p, d, t, borrow) {
+    const v = b[p] || 0;
+    if (v >= d) {
+      const [h, n] = beadsOf(v), [dh, dn] = beadsOf(d);
+      t.add(n >= dn && h >= dh ? "direct" : "five");
+      b[p] = v - d;
+    } else {
+      const c = 10 - d, [h, n] = beadsOf(v), [ch, cn] = beadsOf(c);
+      t.add(n + cn <= 4 && h + ch <= 1 ? "ten" : "combo");
+      if (borrow) t.add("chain");
+      b[p] = v + c;
+      if (p > 40) return;
+      subAt(b, p + 1, 1, t, true);
+    }
+  }
+  const digitsLE = x => String(x).split("").reverse().map(Number);
+  // 最初の数をおいてから、つぎつぎに ±x を 上のけたから 入れていく
+  function techniques(start, terms) {
+    const b = digitsLE(start), t = new Set();
+    for (const x of terms) {
+      const xd = digitsLE(Math.abs(x));
+      for (let p = xd.length - 1; p >= 0; p--) if (xd[p]) (x > 0 ? addAt : subAt)(b, p, xd[p], t, false);
+    }
+    return t;
+  }
+  // 9や0が多い数（くりあがり・くりさがりが つづく問題用）
+  function biased(n, dig) {
+    let s = String(rnd(1, 9));
+    for (let k = 1; k < n; k++) s += Math.random() < 0.55 ? dig : rand(10);
+    return +s;
+  }
+  // レベルごとの出し方：make で数を作り、ok で使うわざを確かめる
+  function planAS(op, L) {
+    const r = Math.random(), coin = Math.random() < 0.5;
+    const has = x => t => t.has(x);
+    const none = (...xs) => t => xs.every(x => !t.has(x));
+    if (op === "addsub") {
+      if (L >= 4 && r < 0.5) {   // 3口（25 ＋ 13 − 17 など）
+        const big = L === 5;
+        const n = () => (big ? nd(rnd(2, 3)) : (Math.random() < 0.75 ? nd(2) : rnd(2, 9)));
+        return {
+          make: () => { const s = coin ? [1, -1] : [-1, 1]; return [big ? nd(3) : nd(2), s[0] * n(), s[1] * n()]; },
+          ok: big ? has("ten") : () => true
+        };
+      }
+      return planAS(coin ? "add" : "sub", L);
+    }
+    if (op === "add") {
+      if (L === 1) return { make: () => [rnd(1, 8), rnd(1, 8)], ok: (t, v) => v <= 9 && none("five", "ten", "combo")(t) };
+      if (L === 2) { const w = Math.random() < 0.8; return { make: () => [rnd(1, 8), rnd(1, 8)], ok: (t, v) => v <= 9 && (!w || t.has("five")) }; }
+      if (L === 3) { const w = Math.random() < 0.8; return { make: () => [rnd(1, 9), rnd(1, 9)], ok: (t, v) => !t.has("combo") && (w ? t.has("ten") : v <= 9) }; }
+      if (L === 4) {
+        if (r < 0.3) return { make: () => [rnd(1, 9), rnd(1, 9)], ok: has("combo") };
+        const w = Math.random() < 0.6;
+        return { make: () => [nd(2), coin ? rnd(1, 9) : nd(2)], ok: t => (w ? t.has("combo") : t.has("ten")) };
+      }
+      if (r < 0.25) return { make: () => [biased(rnd(3, 4), 9), nd(rnd(1, 3))], ok: has("chain") };
+      if (r < 0.6) return { make: () => [nd(rnd(3, 4)), nd(rnd(2, 4))], ok: has("ten") };
+      return { make: () => [nd(rnd(2, 3)), nd(rnd(2, 3)), nd(rnd(2, 3))], ok: has("ten") };
+    }
+    // ひきざん
+    const one = () => { const a = rnd(2, 9); return [a, -rnd(1, a - 1)]; };
+    const teen = () => { const a = rnd(11, 18); return [a, -rnd(a - 9, 9)]; };
+    if (L === 1) return { make: one, ok: none("five", "ten", "combo") };
+    if (L === 2) { const w = Math.random() < 0.8; return { make: one, ok: t => !w || t.has("five") }; }
+    if (L === 3) return Math.random() < 0.8 ? { make: teen, ok: t => t.has("ten") && !t.has("combo") } : planAS("sub", 2);
+    if (L === 4) {
+      if (r < 0.3) return { make: teen, ok: has("combo") };
+      const w = Math.random() < 0.6;
+      return { make: () => { const a = nd(2); return [a, -(coin ? rnd(1, 9) : rnd(10, a - 1))]; }, ok: t => (w ? t.has("combo") : t.has("ten")) };
+    }
+    if (r < 0.25) return { make: () => [biased(rnd(3, 4), 0), -nd(rnd(1, 3))], ok: has("chain") };
+    if (r < 0.6) return { make: () => { const a = nd(rnd(3, 4)); return [a, -rnd(10, a - 1)]; }, ok: has("ten") };
+    return { make: () => [nd(3), -nd(2), -nd(2)], ok: has("ten") };
+  }
+  function genAS(op, L) {
+    for (let round = 0; round < 4; round++) {
+      const plan = planAS(op, L);
+      for (let i = 0; i < 500; i++) {
+        const terms = plan.make();
+        let v = terms[0], bad = false;
+        for (const x of terms.slice(1)) { if (!x) bad = true; v += x; if (v < 0) bad = true; }
+        if (bad || v <= 0) continue;
+        const t = techniques(terms[0], terms.slice(1));
+        if (!plan.ok(t, v)) continue;
+        const ops = new Set(terms.slice(1).map(x => (x > 0 ? "add" : "sub")));
+        return {
+          op: ops.size > 1 ? "addsub" : [...ops][0], loose: false, answer: v,
+          text: terms[0] + terms.slice(1).map(x => ` ${x > 0 ? "＋" : "−"} ${Math.abs(x)}`).join("")
+        };
+      }
+    }
+    return { op: "add", loose: false, answer: 3, text: "1 ＋ 2" };
+  }
+  function genMul(L) {
+    const [da, db] = [[1, 1], [2, 1], [3, 1], [2, 2], [3, 2]][L - 1];
+    const a = da === 1 ? rnd(2, 9) : nz(da), b = db === 1 ? rnd(2, 9) : nz(db);
+    return { op: "mul", loose: true, answer: a * b, text: `${a} × ${b}` };
+  }
+  // わりざんは すべて わりきれる問題
+  function genDiv(L) {
+    let b = 2, q = 2;
+    for (let i = 0; i < 100; i++) {
+      if (L === 1) { b = rnd(2, 9); q = rnd(2, 9); }
+      else {
+        b = L <= 3 ? rnd(2, 9) : nz(2);
+        const [lo, hi] = [[10, 99], [100, 999], [100, 9999], [1000, 99999]][L - 2];
+        q = rnd(Math.max(2, Math.ceil(lo / b)), Math.floor(hi / b));
+      }
+      if (q % 10 !== 0 || Math.random() < 0.25) break;
+    }
+    return { op: "div", loose: true, answer: q, text: `${b * q} ÷ ${b}` };
+  }
+  // かずをおく：いろいろな大きさ（まず桁数を選んでからその桁の数を作る）
+  function genPut() {
     for (let tries = 0; tries < 50; tries++) {
       const k = 1 + rand(intDigits);
       const I = k === 1 ? rand(10) : 10 ** (k - 1) + rand(9 * 10 ** (k - 1));
@@ -1021,19 +1290,61 @@ svg#abacus { width: 100%; flex: 1 1 0; min-height: 0; touch-action: none; displa
       const d = decs.slice();
       while (d.length && d[d.length - 1] === 0) d.pop();
       const str = String(I) + (d.length ? "." + d.join("") : "");
-      if ((I === 0 && !d.length) || str === quiz.lastStr) continue;
-      quiz.I = I; quiz.decs = decs; quiz.str = str; quiz.lastStr = str;
-      return;
+      if ((I === 0 && !d.length) || str === quiz.lastText) continue;
+      quiz.lastText = str;
+      return { op: "put", text: str, I, decs };
+    }
+    return { op: "put", text: "1", I: 1, decs: [] };
+  }
+  const putDigit = (q, p) => (p >= 0 ? Math.floor(q.I / 10 ** p) % 10 : (q.decs[-p - 1] || 0));
+  function genOne(type, L) {
+    let op = type;
+    if (type === "muldiv") op = Math.random() < 0.5 ? "mul" : "div";
+    if (type === "all") op = pick(["add", "sub", "mul", "div"]);
+    if (op === "mul") return genMul(L);
+    if (op === "div") return genDiv(L);
+    return genAS(op, L);
+  }
+  function genProblem(type, L) {
+    let p = null;
+    for (let i = 0; i < 20; i++) { p = genOne(type, L); if (p.text !== quiz.lastText) break; }
+    quiz.lastText = p.text;
+    return p;
+  }
+  const secOf = q => (SEC[q.op] || SEC.add)[quizLevel - 1];
+
+  // --- 出題と答えあわせ ---
+  let lastShown = "";
+  function fitQ() {
+    qNum.style.fontSize = "";
+    let fs = parseFloat(getComputedStyle(qNum).fontSize) || 40;
+    for (let k = 0; k < 14 && qNum.scrollWidth > qNum.clientWidth && fs > 14; k++) {
+      fs *= 0.9;
+      qNum.style.fontSize = fs + "px";
     }
   }
+  window.addEventListener("resize", () => { if (mode === "quiz") fitQ(); });
   function updateBar() {
-    qNum.textContent = quiz.str;
-    qCount.textContent = `${Math.min(quiz.count + (quiz.solved ? 0 : 1), QUIZ_TOTAL)} / ${QUIZ_TOTAL}もん`;
-    qTime.textContent = fmtTime(quiz.elapsed + (quiz.solved ? 0 : performance.now() - quiz.qStart));
+    const q = quiz.q;
+    const showAns = q && quiz.solved && !quiz.failed && q.op !== "put";
+    const txt = q ? (showAns ? `${q.text} ＝ ${q.answer}` : q.text) : "";
+    if (txt !== lastShown) { qNum.textContent = txt; lastShown = txt; fitQ(); }
+    qCount.textContent = `${Math.min(quiz.count + (quiz.solved ? 0 : 1), quiz.total)} / ${quiz.total}もん`;
+    const used = quiz.elapsed + (quiz.solved ? 0 : performance.now() - quiz.qStart);
+    if (quiz.test) {
+      const left = Math.max(0, quiz.limit - used);
+      qTime.textContent = `のこり ${fmtTime(left + 999)}`;
+      qTime.classList.toggle("warn", left < quiz.limit * 0.2);
+      if (left <= 0 && !quiz.solved) failTest();
+    } else {
+      qTime.textContent = fmtTime(used);
+      qTime.classList.remove("warn");
+    }
+    qPick.textContent = quiz.test ? `テスト Lv${quizLevel}` : TYPE[quizType].short + (quizType === "put" ? "" : ` Lv${quizLevel}`);
   }
   function newQuestion() {
     clearTimeout(quiz.hold); quiz.hold = null;
-    genTarget();
+    quiz.q = quiz.test ? quiz.testQs[quiz.count] : (quizType === "put" ? genPut() : genProblem(quizType, quizLevel));
     quiz.solved = false;
     values.clear();
     build();
@@ -1041,53 +1352,200 @@ svg#abacus { width: 100%; flex: 1 1 0; min-height: 0; touch-action: none; displa
     updateBar();
   }
   function startSet() {
+    quiz.test = false; quiz.failed = false; quiz.total = SET_SIZE;
     quiz.count = 0; quiz.elapsed = 0; quiz.finished = false;
     newQuestion();
   }
+  function prepareTest() {
+    const qs = [];
+    for (let k = 0; k < TEST_SIZE; k++) qs.push(genProblem(quizType, quizLevel));
+    return { qs, limit: qs.reduce((s, q) => s + secOf(q), 0) * 1000 };
+  }
+  function startTest(p) {
+    quiz.test = true; quiz.failed = false; quiz.total = TEST_SIZE;
+    quiz.testQs = p.qs; quiz.limit = p.limit;
+    quiz.count = 0; quiz.elapsed = 0; quiz.finished = false;
+    newQuestion();
+  }
+  // 足し算・引き算は位置もふくめてぴったり。掛け算・割り算は答えのならびが合っていれば正解（定位のずれはゆるす）
   function isCorrect() {
-    return places.every(p => { const s = getVal(p); return s.h * 5 + s.n === targetDigit(p); });
+    const q = quiz.q;
+    if (!q) return false;
+    if (q.op === "put") return places.every(p => { const s = getVal(p); return s.h * 5 + s.n === putDigit(q, p); });
+    const v = places.map(p => { const s = getVal(p); return s.h * 5 + s.n; });
+    if (!q.loose) {
+      let N = 0;
+      places.forEach((p, i) => { N += v[i] * 10 ** p; });
+      return N === q.answer;
+    }
+    const pat = v.join("").replace(/^0+/, "").replace(/0+$/, "");
+    return pat !== "" && pat === String(q.answer).replace(/0+$/, "");
   }
   // そろえたら少しだけ待ってから正解にする（通り過ぎただけのときは数えない）
   function checkQuiz() {
-    if (mode !== "quiz" || quiz.solved || !quiz.str) return;
+    if (mode !== "quiz" || quiz.solved || !quiz.q) return;
     if (isCorrect()) {
       if (!quiz.hold) quiz.hold = setTimeout(() => { quiz.hold = null; if (!quiz.solved && isCorrect()) onSolved(); }, 450);
     } else { clearTimeout(quiz.hold); quiz.hold = null; }
   }
   function onSolved() {
+    if (quiz.test && quiz.elapsed + performance.now() - quiz.qStart > quiz.limit) { failTest(); return; }
     quiz.solved = true;
     quiz.elapsed += performance.now() - quiz.qStart;
     quiz.count++;
-    quiz.finished = quiz.count >= QUIZ_TOTAL;
-    svg.classList.remove("hide-answer");
+    quiz.finished = quiz.count >= quiz.total;
+    render();
     updateBar();
-    celebrate(quiz.finished);
+    if (quiz.test) { if (quiz.finished) passTest(); else celebrate("testq"); }
+    else if (quiz.finished) finishSet();
+    else celebrate("q");
+  }
+  function finishSet() {
+    let note = "";
+    if (quizType !== "put") {
+      const key = `${quizType}-${quizLevel}`;
+      progress.sets[key] = (progress.sets[key] || 0) + 1;
+      saveProgress();
+      const u = unlockedOf(quizType), s = progress.sets[key];
+      if (quizLevel === u && u < 5) {
+        note = s >= SETS_FOR_TEST ? "しんきゅうテストに ちょうせん できるよ！" : `しんきゅうテストまで あと ${SETS_FOR_TEST - s}セット`;
+      }
+    }
+    celebrate("set", note);
+  }
+  function passTest() {
+    progress.unlock[quizType] = Math.min(5, Math.max(unlockedOf(quizType), quizLevel + 1));
+    saveProgress();
+    celebrate("pass");
+  }
+  function failTest() {
+    quiz.failed = true; quiz.solved = true;
+    clearTimeout(quiz.hold); quiz.hold = null;
+    render();
+    showTestSheet("fail");
   }
   function applyMode() {
     const q = mode === "quiz";
     quizBar.hidden = !q;
     vizSection.hidden = q;
     clearInterval(quiz.ticker); quiz.ticker = null;
+    clearTimeout(quiz.hold); quiz.hold = null;
+    quiz.test = false;
     if (q) {
       quiz.ticker = setInterval(() => { if (!quiz.solved && mode === "quiz") updateBar(); }, 500);
       startSet();
     } else {
-      clearTimeout(quiz.hold); quiz.hold = null;
-      render();
+      build();
     }
   }
-  bindSeg("seg-mode", () => mode, v => {
+  const syncMode = bindSeg("seg-mode", () => mode, v => {
     if (v === mode) return;
     mode = v;
     try { localStorage.setItem("soroban-mode", v); } catch (_) {}
     applyMode();
+  });
+  bindSeg("seg-lock", () => (noLock ? "off" : "on"), v => {
+    noLock = v === "off";
+    try { localStorage.setItem("soroban-nolock", noLock ? "on" : "off"); } catch (_) {}
+  });
+
+  // --- しんきゅうテストの画面 ---
+  const testEl = $("test");
+  let testSheetMode = "intro", prepared = null;
+  function showTestSheet(kind) {
+    testSheetMode = kind;
+    const name = TYPE[quizType].name;
+    if (kind === "intro") {
+      prepared = prepareTest();
+      $("test-title").textContent = "しんきゅうテスト";
+      $("test-msg").textContent = `${name}　レベル${quizLevel} → レベル${quizLevel + 1}\n${TEST_SIZE}もんを ${fmtTimeJa(prepared.limit)}いないに\nぜんぶ とけたら ごうかく！`;
+      $("test-go").textContent = "スタート";
+      $("test-cancel").textContent = "やめる";
+    } else {
+      $("test-title").textContent = "じかんぎれ…";
+      $("test-msg").textContent = `${TEST_SIZE}もんちゅう ${quiz.count}もん できたよ。\nもういちど ちょうせん してみよう！`;
+      $("test-go").textContent = "もういちど";
+      $("test-cancel").textContent = "れんしゅうに もどる";
+    }
+    testEl.hidden = false;
+    $("test-go").focus();
+  }
+  function openTest(type) {
+    quizType = type;
+    quizLevel = unlockedOf(type);
+    saveSel();
+    if (mode !== "quiz") {
+      mode = "quiz";
+      try { localStorage.setItem("soroban-mode", mode); } catch (_) {}
+      syncMode();
+      applyMode();
+    } else startSet();
+    showTestSheet("intro");
+  }
+  $("test-go").addEventListener("click", () => {
+    testEl.hidden = true;
+    if (testSheetMode === "fail") prepared = prepareTest();
+    ensureAudio();
+    startTest(prepared);
+  });
+  $("test-cancel").addEventListener("click", () => {
+    testEl.hidden = true;
+    if (testSheetMode === "fail") startSet();
+  });
+
+  // --- もんだいを えらぶ画面 ---
+  const pickerEl = $("picker");
+  const LOCK = `<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><rect x="3" y="7" width="10" height="8" rx="2" fill="currentColor"/><path d="M5.2 7V5a2.8 2.8 0 0 1 5.6 0v2" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>`;
+  function renderPicker() {
+    $("picker-list").innerHTML = TYPES.map(t => {
+      if (t.k === "put") {
+        return `<div class="p-row"><div class="p-name">${t.name}</div><div class="p-levels">` +
+          `<button type="button" data-t="put" data-l="1" aria-pressed="${quizType === "put"}">はじめる</button></div>` +
+          `<div class="p-status">すうじを みて そろばんに おく</div></div>`;
+      }
+      const u = unlockedOf(t.k);
+      const lv = [1, 2, 3, 4, 5].map(L => {
+        const open = isOpen(t.k, L), on = quizType === t.k && quizLevel === L;
+        return `<button type="button" data-t="${t.k}" data-l="${L}" aria-pressed="${on}"${open ? "" : " disabled"}` +
+          ` aria-label="レベル${L}${open ? "" : "（まだ ひらいていない）"}">${open ? "" : LOCK}Lv${L}</button>`;
+      }).join("");
+      let st;
+      if (u >= 5) st = `<span class="done">ぜんぶ ひらいたよ！</span>`;
+      else if (testReady(t.k)) st = `<button type="button" class="test-btn" data-test="${t.k}">Lv${u + 1}への しんきゅうテスト</button>`;
+      else {
+        const s = setsOf(t.k, u);
+        st = `<span class="prog"><span class="bar"><i style="width:${(s * 100) / SETS_FOR_TEST}%"></i></span>Lv${u}の シール ${s}/${SETS_FOR_TEST}</span>`;
+      }
+      return `<div class="p-row"><div class="p-name">${t.name}</div><div class="p-levels">${lv}</div><div class="p-status">${st}</div></div>`;
+    }).join("");
+  }
+  qPick.addEventListener("click", () => { renderPicker(); pickerEl.hidden = false; $("close-picker").focus(); });
+  const closePicker = () => { pickerEl.hidden = true; qPick.focus(); };
+  $("close-picker").addEventListener("click", closePicker);
+  pickerEl.addEventListener("click", e => {
+    if (e.target === pickerEl) { closePicker(); return; }
+    const tb = e.target.closest("[data-test]");
+    if (tb) { pickerEl.hidden = true; openTest(tb.dataset.test); return; }
+    const b = e.target.closest("button[data-t]");
+    if (!b || b.disabled) return;
+    quizType = b.dataset.t;
+    quizLevel = +b.dataset.l;
+    saveSel();
+    pickerEl.hidden = true;
+    startSet();
+  });
+  document.addEventListener("keydown", e => {
+    if (e.key !== "Escape") return;
+    if (!pickerEl.hidden) closePicker();
+    if (!testEl.hidden) $("test-cancel").click();
   });
 
   // ===== 正解の演出：花丸と打ち上げ花火 =====
   const celEl = $("celebrate"), fwCanvas = $("fw"), hanaSvg = $("hanamaru");
   let celReady = false, fwRaf = 0, fwTimers = [];
 
-  function drawHanamaru() {
+  function drawHanamaru(fast) {
+    const f = fast ? 0.35 : 1;
     const c = 200;
     let sp = "";
     const turns = 2.6, steps = 150;
@@ -1112,16 +1570,16 @@ svg#abacus { width: 100%; flex: 1 1 0; min-height: 0; touch-action: none; displa
       { transform: "scale(0.4) rotate(-25deg)", opacity: 0 },
       { transform: "scale(1.07) rotate(4deg)", opacity: 1, offset: 0.6 },
       { transform: "scale(1) rotate(0deg)", opacity: 1 }
-    ], { duration: 600, easing: "ease-out" });
+    ], { duration: 600 * f, easing: "ease-out" });
     const lines = hanaSvg.querySelectorAll(".hm-line");
     lines.forEach((p, k) => {
       const len = p.getTotalLength();
       p.style.strokeDasharray = len;
       p.style.strokeDashoffset = len;
       p.animate([{ strokeDashoffset: len }, { strokeDashoffset: 0 }],
-        { duration: k ? 750 : 600, delay: k ? 550 : 0, easing: "ease-in-out", fill: "forwards" });
+        { duration: (k ? 750 : 600) * f, delay: (k ? 550 : 0) * f, easing: "ease-in-out", fill: "forwards" });
     });
-    hanaSvg.querySelector("#hm-fill").animate([{ opacity: 0 }, { opacity: 0.95 }], { duration: 400, delay: 1150, fill: "forwards" });
+    hanaSvg.querySelector("#hm-fill").animate([{ opacity: 0 }, { opacity: 0.95 }], { duration: 400 * f, delay: 1150 * f, fill: "forwards" });
   }
 
   const FW_COLORS = ["#ff4d6d", "#ffd23f", "#4dd0ff", "#a77bff", "#5cff9d", "#ff8a3d", "#ffffff", "#ff7ad9"];
@@ -1236,16 +1694,19 @@ svg#abacus { width: 100%; flex: 1 1 0; min-height: 0; touch-action: none; displa
     `<path d="M14 74L20 30L36 52L50 22L64 52L80 30L86 74Z" fill="#ffcc33" stroke="#e0a100" stroke-width="2" stroke-linejoin="round"/><rect x="14" y="70" width="72" height="12" rx="3" fill="#f0b400"/><circle cx="50" cy="76" r="5" fill="#ff4d6d"/><circle cx="30" cy="76" r="4" fill="#4dd0ff"/><circle cx="70" cy="76" r="4" fill="#4dd0ff"/>`,
     `<path d="M50 30C50 18 60 12 70 12" fill="none" stroke="#2f8f46" stroke-width="4" stroke-linecap="round"/><path d="M50 30C44 44 36 52 34 56M50 30C56 44 62 50 66 54" fill="none" stroke="#2f8f46" stroke-width="4" stroke-linecap="round"/><circle cx="34" cy="68" r="16" fill="#e8262c"/><circle cx="66" cy="66" r="16" fill="#e8262c"/><circle cx="29" cy="62" r="4" fill="#ffffff" opacity=".7"/><circle cx="61" cy="60" r="4" fill="#ffffff" opacity=".7"/>`,
     `<path d="M12 72A38 38 0 0 1 88 72" fill="none" stroke="#ff4d4d" stroke-width="8"/><path d="M20 72A30 30 0 0 1 80 72" fill="none" stroke="#ffb13d" stroke-width="8"/><path d="M28 72A22 22 0 0 1 72 72" fill="none" stroke="#ffe14d" stroke-width="8"/><path d="M36 72A14 14 0 0 1 64 72" fill="none" stroke="#4dc4ff" stroke-width="8"/><circle cx="16" cy="74" r="9" fill="#ffffff" stroke="#d8e6f0" stroke-width="2"/><circle cx="84" cy="74" r="9" fill="#ffffff" stroke="#d8e6f0" stroke-width="2"/>`,
-    `<path d="M60 12A38 38 0 1 0 88 66A30 30 0 1 1 60 12Z" fill="#ffd23f" stroke="#f0a500" stroke-width="2"/><polygon points="${star5(76, 26, 9, 4)}" fill="#fff3a6"/>`
+    `<path d="M60 12A38 38 0 1 0 88 66A30 30 0 1 1 60 12Z" fill="#ffd23f" stroke="#f0a500" stroke-width="2"/><polygon points="${star5(76, 26, 9, 4)}" fill="#fff3a6"/>`,
+    // 8: しんきゅうテスト合格の メダル
+    `<path d="M28 6L44 42L35 47L19 11Z" fill="#4d8bff"/><path d="M72 6L56 42L65 47L81 11Z" fill="#ff4d6d"/><circle cx="50" cy="62" r="30" fill="#ffcc33" stroke="#d9a400" stroke-width="3"/><circle cx="50" cy="62" r="21" fill="none" stroke="#fff3a6" stroke-width="2.5"/><polygon points="${star5(50, 63, 14, 6)}" fill="#fff3a6"/>`
   ];
+  const MEDAL = 8;
   const stickerSVG = i => `<svg class="sticker" viewBox="0 0 100 100" aria-hidden="true"><g class="st-outline">${STICKERS[i]}</g>${STICKERS[i]}</svg>`;
   const dkey = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   function loadStickers() {
     try { const a = JSON.parse(localStorage.getItem("soroban-stickers") || "[]"); return Array.isArray(a) ? a : []; } catch (_) { return []; }
   }
-  function awardSticker() {
+  function awardSticker(medal) {
     const list = loadStickers();
-    const s = rand(STICKERS.length);
+    const s = medal ? MEDAL : rand(MEDAL);
     list.push({ d: dkey(new Date()), s });
     try { localStorage.setItem("soroban-stickers", JSON.stringify(list)); } catch (_) {}
     return { s, today: list.filter(x => x.d === dkey(new Date())).length };
@@ -1258,8 +1719,11 @@ svg#abacus { width: 100%; flex: 1 1 0; min-height: 0; touch-action: none; displa
     const byDay = {};
     list.forEach(x => { (byDay[x.d] = byDay[x.d] || []).push(x.s); });
     const todayKey = dkey(new Date());
-    const tc = (byDay[todayKey] || []).length;
-    $("book-today").innerHTML = tc ? `きょうは<b>${tc}</b>セット クリア！` : "きょうのシールは まだないよ。もんだいモードで5もん とこう！";
+    const todayList = byDay[todayKey] || [];
+    const tc = todayList.filter(s => s !== MEDAL).length, tm = todayList.length - tc;
+    $("book-today").innerHTML = todayList.length
+      ? `きょうは<b>${tc}</b>セット クリア！` + (tm ? `　メダル<b>${tm}</b>こ` : "")
+      : "きょうのシールは まだないよ。もんだいモードで5もん とこう！";
     const y = bookMonth.getFullYear(), m = bookMonth.getMonth();
     $("m-label").textContent = `${y}ねん ${m + 1}がつ`;
     const now = new Date();
@@ -1291,37 +1755,67 @@ svg#abacus { width: 100%; flex: 1 1 0; min-height: 0; touch-action: none; displa
   $("m-prev").addEventListener("click", () => { bookMonth.setMonth(bookMonth.getMonth() - 1); renderBook(); });
   $("m-next").addEventListener("click", () => { bookMonth.setMonth(bookMonth.getMonth() + 1); renderBook(); });
 
-  function celebrate(final) {
+  // kind: q=1もん正解  set=5もんクリア  testq=テスト中の正解  pass=テスト合格
+  let celKind = "q", celTimer = 0;
+  function showSticker(s) {
     const stEl = $("cel-sticker");
-    if (final) {
-      const got = awardSticker();
-      $("cel-title").textContent = `${QUIZ_TOTAL}もん クリア！`;
-      $("cel-sub").textContent = `シールゲット！（きょう ${got.today}まいめ）　じかん ${fmtTimeJa(quiz.elapsed)}\nタップでもういちど`;
-      stEl.innerHTML = stickerSVG(got.s);
-      stEl.hidden = false;
-      if (stEl.animate) stEl.animate([
-        { transform: "scale(0) rotate(-40deg)", opacity: 0 },
-        { transform: "scale(1.25) rotate(10deg)", opacity: 1, offset: 0.6 },
-        { transform: "scale(1) rotate(8deg)", opacity: 1 }
-      ], { duration: 550, delay: 1400, easing: "ease-out", fill: "both" });
+    stEl.innerHTML = stickerSVG(s);
+    stEl.hidden = false;
+    if (stEl.animate) stEl.animate([
+      { transform: "scale(0) rotate(-40deg)", opacity: 0 },
+      { transform: "scale(1.25) rotate(10deg)", opacity: 1, offset: 0.6 },
+      { transform: "scale(1) rotate(8deg)", opacity: 1 }
+    ], { duration: 550, delay: 1400, easing: "ease-out", fill: "both" });
+  }
+  function celebrate(kind, note) {
+    celKind = kind;
+    $("cel-sticker").hidden = true;
+    const tEl = $("cel-title"), sEl = $("cel-sub");
+    if (kind === "set") {
+      const got = awardSticker(false);
+      tEl.textContent = `${SET_SIZE}もん クリア！`;
+      sEl.textContent = `シールゲット！（きょう ${got.today}まいめ）　じかん ${fmtTimeJa(quiz.elapsed)}` +
+        (note ? `\n${note}` : "") + "\nタップで もういちど";
+      showSticker(got.s);
+    } else if (kind === "pass") {
+      const got = awardSticker(true);
+      tEl.textContent = "ごうかく！";
+      sEl.textContent = `${TYPE[quizType].name} レベル${quizLevel + 1}が ひらいたよ！\nメダルシールを ゲット！　じかん ${fmtTimeJa(quiz.elapsed)}\nタップで つぎのレベルへ`;
+      showSticker(got.s);
+    } else if (kind === "testq") {
+      tEl.textContent = "せいかい！";
+      sEl.textContent = `${quiz.count} / ${TEST_SIZE}もん`;
     } else {
-      $("cel-title").textContent = "せいかい！";
-      $("cel-sub").textContent = "タップでつぎのもんだい";
-      stEl.hidden = true;
+      tEl.textContent = "せいかい！";
+      sEl.textContent = "タップでつぎのもんだい";
     }
     celEl.hidden = false;
     celReady = false;
-    setTimeout(() => { celReady = true; }, 700);
-    drawHanamaru();
+    drawHanamaru(kind === "testq");
     ensureAudio();
-    fanfare(final);
-    if (!REDUCED) fireworks(final ? 14 : 7);
+    fanfare(kind === "set" || kind === "pass");
+    if (kind === "testq") {
+      // テスト中は タップなしで すぐ つぎへ（このあいだ じかんは とまる）
+      clearTimeout(celTimer);
+      celTimer = setTimeout(() => {
+        celEl.hidden = true;
+        if (mode === "quiz" && quiz.test) newQuestion();
+      }, 950);
+      return;
+    }
+    setTimeout(() => { celReady = true; }, 700);
+    if (!REDUCED) fireworks(kind === "pass" ? 22 : kind === "set" ? 14 : 7);
   }
   celEl.addEventListener("pointerup", () => {
-    if (!celReady) return;
+    if (!celReady || celKind === "testq") return;
     celEl.hidden = true;
     stopFireworks();
-    if (quiz.finished) startSet(); else newQuestion();
+    if (celKind === "pass") {
+      quizLevel = Math.min(5, quizLevel + 1);
+      saveSel();
+      startSet();
+    } else if (quiz.finished) startSet();
+    else newQuestion();
   });
 
   build();
