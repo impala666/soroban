@@ -1112,6 +1112,10 @@ svg#abacus { width: 100%; flex: 1 1 0; min-height: 0; touch-action: none; displa
     { k: "all", name: "ぜんぶ まぜる", short: "ぜんぶ" }
   ];
   const TYPE = Object.fromEntries(TYPES.map(t => [t.k, t]));
+  // たし・ひきには Lv0.5（5玉をつかわない）がある。なかでは レベル0 としてあつかう
+  const HALF = new Set(["add", "sub", "addsub"]);
+  const lvName = L => (L === 0 ? "Lv0.5" : `Lv${L}`);
+  const levelsOf = k => (HALF.has(k) ? [0, 1, 2, 3, 4, 5] : [1, 2, 3, 4, 5]);
   // レベルごとに使う整数のけた数（設定より少なければ自動でふやす）
   //   掛け算：答えのけた＋1　割り算：割られる数のけた＋2（答えを左に立てる分）
   const NEED = {
@@ -1141,14 +1145,15 @@ svg#abacus { width: 100%; flex: 1 1 0; min-height: 0; touch-action: none; displa
   let quizType = "put", quizLevel = 1;
   try {
     const sel = JSON.parse(localStorage.getItem("soroban-quizsel") || "null");
-    if (sel && TYPE[sel.t]) { quizType = sel.t; quizLevel = Math.min(5, Math.max(1, sel.l | 0)); }
+    if (sel && TYPE[sel.t]) { quizType = sel.t; quizLevel = Math.min(5, Math.max(HALF.has(sel.t) ? 0 : 1, sel.l | 0)); }
   } catch (_) {}
   if (!isOpen(quizType, quizLevel)) quizLevel = unlockedOf(quizType);
   const saveSel = () => { try { localStorage.setItem("soroban-quizsel", JSON.stringify({ t: quizType, l: quizLevel })); } catch (_) {} };
 
   function boardSize() {
     if (mode === "quiz" && quizType !== "put") {
-      return { i: Math.min(INT_MAX, Math.max(intDigits, NEED[quizType][quizLevel - 1])), d: 0 };
+      const need = quizLevel === 0 ? 1 : NEED[quizType][quizLevel - 1];
+      return { i: Math.min(INT_MAX, Math.max(intDigits, need)), d: 0 };
     }
     return { i: intDigits, d: decDigits };
   }
@@ -1220,6 +1225,31 @@ svg#abacus { width: 100%; flex: 1 1 0; min-height: 0; touch-action: none; displa
     const r = Math.random(), coin = Math.random() < 0.5;
     const has = x => t => t.has(x);
     const none = (...xs) => t => xs.every(x => !t.has(x));
+    if (L === 0) {   // Lv0.5：1玉だけで計算（盤の数がいつも 0〜4）
+      // 口数：たすだけ・ひくだけは 2〜4口（5口だと5玉が要る）、まぜるときは 2〜5口
+      const ROWS = op === "addsub" ? [2, 3, 3, 4, 4, 5, 5] : [2, 2, 3, 3, 3, 4];
+      return {
+        make: () => {
+          const rows = pick(ROWS);
+          for (let tries = 0; tries < 80; tries++) {
+            let v = rnd(1, 4), ok = true;
+            const terms = [v], pre = [v];
+            for (let k = 1; k < rows && ok; k++) {
+              const sign = op === "add" ? 1 : op === "sub" ? -1 : (v >= 4 ? -1 : v <= 0 ? 1 : (Math.random() < 0.5 ? 1 : -1));
+              const room = sign > 0 ? 4 - v : v;
+              if (room < 1) { ok = false; break; }
+              const x = rnd(1, room);
+              terms.push(sign * x);
+              v += sign * x;
+              pre.push(v);
+            }
+            if (ok && v > 0 && !pre.slice(0, -1).includes(v)) return terms;
+          }
+          return [0];
+        },
+        ok: none("five", "ten", "combo")
+      };
+    }
     if (op === "addsub") {
       if (L >= 4 && r < 0.5) {   // 3口（25 ＋ 13 − 17 など）
         const big = L === 5;
@@ -1267,6 +1297,10 @@ svg#abacus { width: 100%; flex: 1 1 0; min-height: 0; touch-action: none; displa
         let v = terms[0], bad = false;
         for (const x of terms.slice(1)) { if (!x) bad = true; v += x; if (v < 0) bad = true; }
         if (bad || v <= 0) continue;
+        // とちゅうの盤が答えと同じになる問題は出さない（そこで正解あつかいになってしまうため）
+        let s = terms[0], early = s === v;
+        for (const x of terms.slice(1, -1)) { s += x; if (s === v) early = true; }
+        if (early) continue;
         const t = techniques(terms[0], terms.slice(1));
         if (!plan.ok(t, v)) continue;
         const ops = new Set(terms.slice(1).map(x => (x > 0 ? "add" : "sub")));
@@ -1328,7 +1362,7 @@ svg#abacus { width: 100%; flex: 1 1 0; min-height: 0; touch-action: none; displa
     quiz.lastText = p.text;
     return p;
   }
-  const secOf = q => (SEC[q.op] || SEC.add)[quizLevel - 1];
+  const secOf = q => (SEC[q.op] || SEC.add)[Math.max(0, quizLevel - 1)];
 
   // --- 出題と答えあわせ ---
   let lastShown = "";
@@ -1376,7 +1410,7 @@ svg#abacus { width: 100%; flex: 1 1 0; min-height: 0; touch-action: none; displa
       qTime.textContent = fmtTime(used);
       qTime.classList.remove("warn");
     }
-    qPick.textContent = quiz.test ? `テスト Lv${quizLevel}` : TYPE[quizType].short + (quizType === "put" ? "" : ` Lv${quizLevel}`);
+    qPick.textContent = quiz.test ? `テスト ${lvName(quizLevel)}` : TYPE[quizType].short + (quizType === "put" ? "" : ` ${lvName(quizLevel)}`);
   }
   function newQuestion() {
     clearTimeout(quiz.hold); quiz.hold = null;
@@ -1540,10 +1574,10 @@ svg#abacus { width: 100%; flex: 1 1 0; min-height: 0; touch-action: none; displa
           `<div class="p-status">すうじを みて そろばんに おく</div></div>`;
       }
       const u = unlockedOf(t.k);
-      const lv = [1, 2, 3, 4, 5].map(L => {
+      const lv = levelsOf(t.k).map(L => {
         const open = isOpen(t.k, L), on = quizType === t.k && quizLevel === L;
         return `<button type="button" data-t="${t.k}" data-l="${L}" aria-pressed="${on}"${open ? "" : " disabled"}` +
-          ` aria-label="レベル${L}${open ? "" : "（まだ ひらいていない）"}">${open ? "" : LOCK}Lv${L}</button>`;
+          ` aria-label="レベル${L === 0 ? "0.5" : L}${open ? "" : "（まだ ひらいていない）"}">${open ? "" : LOCK}${lvName(L)}</button>`;
       }).join("");
       let st;
       if (u >= 5) st = `<span class="done">ぜんぶ ひらいたよ！</span>`;
